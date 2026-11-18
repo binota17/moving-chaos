@@ -210,18 +210,69 @@ export class SoundManager {
     });
   }
 
-  deliver() {
+  deliver(combo = 1) {
     this._withAudio((now) => {
+      const semitoneBoost = Math.min(6, Math.max(0, (combo - 1))) * 1.06;
+      const pitchMult = combo > 1 ? Math.pow(2, Math.min(7, combo - 1) / 12) : 1.0;
       [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.05);
-        gain.gain.setValueAtTime(0.25, now + idx * 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.2);
+        osc.frequency.setValueAtTime(freq * pitchMult + semitoneBoost, now + idx * 0.045);
+        gain.gain.setValueAtTime(0.25, now + idx * 0.045);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.045 + 0.22);
         osc.connect(gain); gain.connect(this._getSfxDest());
-        osc.start(now + idx * 0.05); osc.stop(now + idx * 0.05 + 0.21);
+        osc.start(now + idx * 0.045); osc.stop(now + idx * 0.045 + 0.23);
       });
+    });
+  }
+
+  dash() {
+    this._withAudio((now) => {
+      const dur = 0.14;
+      const { buffer, data, bufferSize } = this._createNoiseBuffer(dur);
+      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1100, now);
+      filter.frequency.exponentialRampToValueAtTime(420, now + dur);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.32, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + dur);
+      noise.connect(filter); filter.connect(gain); gain.connect(this._getSfxDest());
+      noise.start(now);
+    });
+  }
+
+  catchAir() {
+    this._withAudio((now) => {
+      [440, 659.25, 880].forEach((f, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, now + idx * 0.035);
+        gain.gain.setValueAtTime(0.24, now + idx * 0.035);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.035 + 0.14);
+        osc.connect(gain); gain.connect(this._getSfxDest());
+        osc.start(now + idx * 0.035); osc.stop(now + idx * 0.035 + 0.15);
+      });
+    });
+  }
+
+  petSound() {
+    this._withAudio((now) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(620, now);
+      osc.frequency.exponentialRampToValueAtTime(920, now + 0.07);
+      osc.frequency.exponentialRampToValueAtTime(540, now + 0.16);
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.005, now + 0.17);
+      osc.connect(gain); gain.connect(this._getSfxDest());
+      osc.start(now); osc.stop(now + 0.18);
     });
   }
 

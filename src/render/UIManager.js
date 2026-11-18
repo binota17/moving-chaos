@@ -11,6 +11,7 @@ export class UIManager {
     this.timerTextEl = document.getElementById('timer-text');
     this.rageFillEl = document.getElementById('rage-fill');
     this.bonusHudEl = document.getElementById('bonus-hud-pill');
+    this.comboHudEl = document.getElementById('combo-hud-pill');
 
     this.p1HudEl = document.getElementById('p1-hud');
     this.p1StatusEl = document.getElementById('p1-status');
@@ -34,25 +35,35 @@ export class UIManager {
   }
 
   updateHUD(itemsDelivered, targetItems, score, timeLeft, landlordRage, p1, p2, is2PMode, extra = {}) {
-    if (this.truckCountEl) this.truckCountEl.innerText = `${itemsDelivered} / ${targetItems} ${t('hud_items_suffix')}`;
-    if (this.scoreTextEl) this.scoreTextEl.innerText = score.toLocaleString('vi-VN') + ' đ';
+    if (this.truckCountEl) this.truckCountEl.innerText = `${itemsDelivered}/${targetItems}`;
+    if (this.scoreTextEl) this.scoreTextEl.innerText = score.toLocaleString('vi-VN') + 'đ';
     if (this.timerTextEl) {
       this.timerTextEl.innerText = timeLeft < 0 ? `♾️ ${Math.abs(timeLeft + 1)}s` : `${timeLeft}s`;
     }
     if (this.rageFillEl) this.rageFillEl.style.width = landlordRage + '%';
 
     if (this.bonusHudEl && extra.bonusLabel) {
-      const bonusIcon = extra.bonusFailed ? '❌' : '✅';
-      const parColor = extra.elapsedSeconds > extra.parTime ? '#fbbf24' : '#6ee7b7';
-      const bonusColor = extra.bonusFailed ? '#f87171' : '#6ee7b7';
-      this.bonusHudEl.innerHTML = `
-        <span style="color:${bonusColor};">🎯 ${extra.bonusLabel} ${bonusIcon}</span>
-        <span style="color:${parColor}; margin-left:8px;">⏱️ Par ${extra.parTime}s (${extra.elapsedSeconds}s)</span>
-      `;
+      const bonusIcon = extra.bonusFailed ? '✕' : '✓';
+      const bonusColor = extra.bonusFailed ? '#dc2626' : '#16a34a';
+      this.bonusHudEl.title = `${extra.bonusLabel} (Par ${extra.parTime}s)`;
+      this.bonusHudEl.innerHTML = `<span style="color:${bonusColor}; font-weight:900;">🎯 ${bonusIcon}</span> <span>${extra.bonusLabel}</span>`;
     }
 
-    if (this.p1StatusEl && p1) {
-      if (p1.stunTimer > 0) this.p1StatusEl.innerText = t('status_stun');
+    if (this.comboHudEl) {
+      if ((extra.combo || 0) >= 2 && (extra.comboTimer || 0) > 0) {
+        const bonusK = Math.min(4, extra.combo - 1) * 350;
+        this.comboHudEl.style.display = 'flex';
+        this.comboHudEl.innerHTML = `<span>🔥 x${extra.combo}</span><span style="margin-left:6px; opacity:0.9;">+${bonusK}k</span><span style="margin-left:6px; font-size:11px; opacity:0.8;">${extra.comboTimer.toFixed(1)}s</span>`;
+      } else {
+        this.comboHudEl.style.display = 'none';
+      }
+    }
+
+    if (this.p1HudEl) {
+      this.p1HudEl.style.display = is2PMode ? 'flex' : 'none';
+    }
+    if (this.p1StatusEl && p1 && is2PMode) {
+      if (p1.stunTimer > 0) this.p1StatusEl.innerText = '💫';
       else if (p1.holdingItem) this.p1StatusEl.innerText = '📦 ' + p1.holdingItem.name;
       else this.p1StatusEl.innerText = t('status_idle');
     }
@@ -61,7 +72,7 @@ export class UIManager {
       if (is2PMode) {
         this.p2HudEl.style.display = 'flex';
         if (p2) {
-          if (p2.stunTimer > 0) this.p2StatusEl.innerText = t('status_stun');
+          if (p2.stunTimer > 0) this.p2StatusEl.innerText = '💫';
           else if (p2.holdingItem) this.p2StatusEl.innerText = '📦 ' + p2.holdingItem.name;
           else this.p2StatusEl.innerText = t('status_idle');
         }
@@ -77,12 +88,12 @@ export class UIManager {
     pill.className = 'feed-pill ' + type;
     pill.innerHTML = text;
     this.deliveryFeedEl.appendChild(pill);
-    if (this.deliveryFeedEl.children.length > 4) {
+    if (this.deliveryFeedEl.children.length > 3) {
       this.deliveryFeedEl.removeChild(this.deliveryFeedEl.children[0]);
     }
     setTimeout(() => {
       if (pill.parentNode) pill.parentNode.removeChild(pill);
-    }, 3500);
+    }, 2200);
   }
 
   showGameOver(score, itemsDelivered, targetItems, landlordRage, options = {}) {

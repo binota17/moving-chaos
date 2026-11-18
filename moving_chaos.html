@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Moving Chaos 3D — Dọn Nhà Siêu Tốc (Bobi 2.5D Isometric)</title>
+  <title>Moving Chaos — Dọn Nhà Siêu Tốc</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
   <script type="importmap">
     {
       "imports": {
@@ -14,22 +17,23 @@
   </script>
   <style>
     :root {
-      --bg-deep: #070b14;
-      --bg-panel: rgba(11, 17, 30, 0.88);
-      --bg-panel-soft: rgba(17, 25, 43, 0.78);
-      --bg-well: rgba(6, 10, 19, 0.65);
-      --border-subtle: rgba(255, 255, 255, 0.11);
-      --border-bright: rgba(255, 255, 255, 0.24);
-      --gold: #fbbf24;
+      --sky-backdrop: #9fd8f4;
+      --paper-bg: #faf7f0;
+      --paper-white: #ffffff;
+      --paper-well: #efe9dc;
+      --ink: #1e242c;
+      --ink-muted: #526071;
+      --coral: #ef4f27;
+      --coral-deep: #9b2609;
+      --sunny: #ffd84d;
       --amber: #f59e0b;
-      --orange: #f97316;
-      --orange-deep: #c2410c;
-      --emerald: #10b981;
-      --cyan: #06b6d4;
-      --danger: #ef4444;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
+      --emerald: #179c52;
+      --emerald-deep: #0d6835;
+      --sky-btn: #0284c7;
+      --danger: #dc2626;
       --active-lvl-accent: #f59e0b;
+      --font-display: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+      --font-sans: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
     }
 
     * {
@@ -42,9 +46,9 @@
     }
 
     body {
-      background: var(--bg-deep);
-      color: var(--text-main);
-      font-family: 'Segoe UI', 'Trebuchet MS', system-ui, -apple-system, sans-serif;
+      background: var(--sky-backdrop);
+      color: var(--ink);
+      font-family: var(--font-sans);
       width: 100vw;
       height: 100vh;
       overflow: hidden;
@@ -54,7 +58,7 @@
       position: relative;
       width: 100vw;
       height: 100vh;
-      background: #131c2e;
+      background: var(--sky-backdrop);
       overflow: hidden;
     }
 
@@ -69,11 +73,13 @@
     #game-container.is-menu .hud-top,
     #game-container.is-menu .hud-bottom,
     #game-container.is-menu .bonus-hud-pill,
+    #game-container.is-menu .combo-hud-pill,
     #game-container.is-menu .delivery-feed,
     #game-container.is-menu .touch-joystick-zone,
     #game-container.is-gameover .hud-top,
     #game-container.is-gameover .hud-bottom,
     #game-container.is-gameover .bonus-hud-pill,
+    #game-container.is-gameover .combo-hud-pill,
     #game-container.is-gameover .delivery-feed,
     #game-container.is-gameover .touch-joystick-zone {
       display: none !important;
@@ -90,19 +96,23 @@
     .floating-3d-toast {
       position: absolute;
       transform: translate(-50%, -50%);
-      font-weight: 900;
-      font-size: 17px;
-      text-shadow: 0 3px 8px rgba(0,0,0,0.95), 0 0 2px #000;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 19px;
+      letter-spacing: 0.3px;
+      -webkit-text-stroke: 4px var(--ink);
+      paint-order: stroke fill;
+      text-shadow: 0 3px 0 var(--ink);
       white-space: nowrap;
-      animation: floatUp3D 1.15s ease-out forwards;
+      animation: floatUp3D 1.1s ease-out forwards;
     }
     @keyframes floatUp3D {
-      0% { opacity: 0; transform: translate(-50%, -20%) scale(0.72); }
-      18% { opacity: 1; transform: translate(-50%, -60%) scale(1.1); }
-      100% { opacity: 0; transform: translate(-50%, -180%) scale(0.95); }
+      0% { opacity: 0; transform: translate(-50%, -15%) scale(0.74); }
+      18% { opacity: 1; transform: translate(-50%, -62%) scale(1.12); }
+      100% { opacity: 0; transform: translate(-50%, -185%) scale(0.95); }
     }
 
-    /* --- TOP IN-GAME HUD BAR --- */
+    /* --- TOP IN-GAME HUD BAR (CLEAN NINTENDO-STYLE INK CARDS) --- */
     .hud-top {
       position: absolute;
       top: 14px;
@@ -117,98 +127,132 @@
     .hud-left-group, .hud-right-group {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
     }
     .hud-card {
-      background: var(--bg-panel);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--border-subtle);
-      border-top: 2px solid rgba(251, 191, 36, 0.45);
-      padding: 7px 14px;
-      border-radius: 12px;
+      background: var(--paper-bg);
+      border: 2.5px solid var(--ink);
+      padding: 6px 13px;
+      border-radius: 13px;
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-weight: 800;
-      font-size: 13.5px;
+      gap: 6px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--ink);
       font-variant-numeric: tabular-nums;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 4px 0 var(--ink);
+    }
+    .hud-left-group .hud-card:first-child {
+      transform: rotate(-1.5deg);
     }
     .player-hud-pill {
       display: flex;
       align-items: center;
-      gap: 7px;
-      padding: 6px 12px;
+      gap: 6px;
+      padding: 5px 11px;
       border-radius: 12px;
       font-size: 12px;
       font-weight: 800;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+      border: 2.5px solid var(--ink);
+      box-shadow: 0 3px 0 var(--ink);
     }
-    .p1-pill { background: rgba(249, 115, 22, 0.24); border: 1.5px solid #fb923c; }
-    .p2-pill { background: rgba(6, 182, 212, 0.24); border: 1.5px solid #22d3ee; }
+    .p1-pill { background: #ffedd5; color: #9a3412; }
+    .p2-pill { background: #e0f2fe; color: #075985; }
 
-    .rage-card { display: flex; align-items: center; gap: 8px; }
+    .rage-card { display: flex; align-items: center; gap: 7px; padding: 6px 11px; }
     .rage-bar-wrap {
-      width: 92px;
-      height: 10px;
-      background: rgba(255, 255, 255, 0.14);
-      border-radius: 5px;
+      width: 78px;
+      height: 11px;
+      background: var(--paper-well);
+      border: 2px solid var(--ink);
+      border-radius: 999px;
       overflow: hidden;
     }
     .rage-bar-fill {
       height: 100%;
       width: 0%;
-      background: linear-gradient(90deg, #fbbf24, #ef4444);
+      background: linear-gradient(90deg, #f59e0b, #ef4444);
       transition: width 0.3s;
     }
 
     .icon-btn {
       pointer-events: auto;
-      background: var(--bg-panel);
-      backdrop-filter: blur(8px);
-      border: 1px solid var(--border-subtle);
-      color: #fff;
-      width: 38px;
-      height: 38px;
-      border-radius: 11px;
+      background: var(--paper-white);
+      border: 2.5px solid var(--ink);
+      color: var(--ink);
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      font-size: 15px;
-      transition: all 0.15s;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+      font-size: 16px;
+      font-weight: 800;
+      transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
+      box-shadow: 0 4px 0 var(--ink);
     }
     .icon-btn:hover {
       transform: translateY(-2px);
-      background: rgba(30, 41, 59, 0.95);
-      border-color: rgba(251, 191, 36, 0.5);
+      background: var(--sunny);
+      box-shadow: 0 6px 0 var(--ink);
+    }
+    .icon-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 var(--ink);
     }
 
     .bonus-hud-pill {
       position: absolute;
-      top: 64px;
+      top: 66px;
       right: 16px;
-      background: var(--bg-panel);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--border-subtle);
-      border-radius: 11px;
-      padding: 6px 13px;
+      background: var(--paper-bg);
+      border: 2px solid var(--ink);
+      border-radius: 10px;
+      padding: 5px 11px;
       font-size: 12px;
       font-weight: 800;
+      color: var(--ink);
       font-variant-numeric: tabular-nums;
       pointer-events: none;
       z-index: 9;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 3px 0 var(--ink);
+    }
+
+    .combo-hud-pill {
+      position: absolute;
+      top: 102px;
+      right: 16px;
+      background: var(--coral);
+      border: 2.5px solid var(--ink);
+      border-radius: 11px;
+      padding: 5px 12px;
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+      z-index: 9;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 4px 0 var(--ink);
+      animation: comboPop 0.28s ease-out;
+    }
+    @keyframes comboPop {
+      0% { transform: scale(0.84); }
+      60% { transform: scale(1.08); }
+      100% { transform: scale(1); }
     }
 
     .delivery-feed {
       position: absolute;
-      top: 64px;
+      top: 66px;
       left: 16px;
-      width: 290px;
+      width: 240px;
       display: flex;
       flex-direction: column;
       gap: 6px;
@@ -216,27 +260,29 @@
       z-index: 9;
     }
     .feed-pill {
-      background: var(--bg-panel);
-      backdrop-filter: blur(8px);
-      border-left: 3.5px solid var(--emerald);
-      padding: 6px 11px;
-      border-radius: 8px;
+      background: var(--paper-bg);
+      border: 2px solid var(--ink);
+      border-left: 5px solid var(--emerald);
+      color: var(--ink);
+      padding: 5px 10px;
+      border-radius: 10px;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
       display: flex;
       justify-content: space-between;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.38);
-      animation: feedIn 0.25s ease-out;
+      gap: 8px;
+      box-shadow: 0 3px 0 var(--ink);
+      animation: feedIn 0.22s ease-out;
     }
-    .feed-pill.broke { border-left-color: var(--danger); color: #fca5a5; }
-    .feed-pill.bounce { border-left-color: var(--amber); color: #fde68a; }
-    .feed-pill.glass { border-left-color: var(--cyan); color: #a5f3fc; }
+    .feed-pill.broke { border-left-color: var(--danger); background: #fef2f2; color: #991b1b; }
+    .feed-pill.bounce { border-left-color: var(--amber); background: #fffbeb; color: #92400e; }
+    .feed-pill.glass { border-left-color: var(--sky-btn); background: #f0f9ff; color: #075985; }
     @keyframes feedIn {
       from { opacity: 0; transform: translateX(-14px); }
       to { opacity: 1; transform: translateX(0); }
     }
 
-    /* --- BOTTOM HUD & PHYSICAL 3D KEYCAPS --- */
+    /* --- BOTTOM HUD & ARCADE BUTTONS --- */
     .hud-bottom {
       position: absolute;
       bottom: 14px;
@@ -249,63 +295,85 @@
       z-index: 10;
     }
     .controls-hint {
-      background: var(--bg-panel);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--border-subtle);
-      padding: 8px 14px;
-      border-radius: 12px;
+      background: var(--paper-bg);
+      border: 2.5px solid var(--ink);
+      padding: 8px 12px 8px 14px;
+      border-radius: 13px;
       font-size: 12px;
-      color: #cbd5e1;
-      display: flex;
+      font-weight: 700;
+      color: var(--ink);
+      display: none;
       gap: 10px;
       align-items: center;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      pointer-events: auto;
+      box-shadow: 0 4px 0 var(--ink);
     }
+    .controls-hint.is-first-play { display: flex; }
+    .hint-close-btn {
+      background: var(--paper-well);
+      border: 2px solid var(--ink);
+      color: var(--ink);
+      width: 24px;
+      height: 24px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .hint-close-btn:hover { background: var(--coral); color: #fff; }
+
     .kbd {
       display: inline-block;
-      background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
-      color: #fde047;
+      background: var(--paper-white);
+      color: var(--ink);
       padding: 1px 6px;
       border-radius: 5px;
       font-weight: 800;
       font-size: 11px;
       font-family: ui-monospace, 'Cascadia Mono', monospace;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-bottom: 2.5px solid #090d16;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+      border: 1.5px solid var(--ink);
+      border-bottom: 3px solid var(--ink);
     }
 
-    .action-touch-btns { display: flex; gap: 8px; pointer-events: auto; }
+    .action-touch-btns { display: flex; gap: 8px; pointer-events: auto; margin-left: auto; }
     .touch-btn {
-      background: var(--bg-panel);
-      border: 2px solid rgba(255, 255, 255, 0.22);
-      color: #fff;
-      padding: 9px 15px;
-      border-radius: 12px;
+      background: var(--paper-white);
+      border: 2.5px solid var(--ink);
+      color: var(--ink);
+      padding: 9px 14px;
+      border-radius: 13px;
       cursor: pointer;
-      font-size: 12.5px;
-      font-weight: 800;
+      font-family: var(--font-display);
+      font-size: 13.5px;
+      font-weight: 700;
       display: flex;
       align-items: center;
-      gap: 6px;
-      transition: all 0.15s;
+      gap: 5px;
+      box-shadow: 0 4px 0 var(--ink);
+      transition: transform 0.1s, box-shadow 0.1s;
     }
-    .touch-btn:hover { transform: translateY(-2px); background: rgba(30, 41, 59, 0.9); }
-    .btn-grab { border-color: var(--amber); background: rgba(245, 158, 11, 0.24); }
-    .btn-throw { border-color: var(--danger); background: rgba(239, 68, 68, 0.24); }
-    .btn-jump { border-color: #38bdf8; background: rgba(56, 189, 248, 0.24); }
+    .touch-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--ink); }
+    .touch-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--ink); }
+    .btn-dash { background: #fef3c7; }
+    .btn-jump { background: #bae6fd; }
+    .btn-grab { background: var(--sunny); }
+    .btn-throw { background: var(--coral); color: #fff; }
 
     /* Virtual Joystick */
     .touch-joystick-zone {
       position: absolute;
       left: 20px;
       bottom: 68px;
-      width: 116px;
-      height: 116px;
+      width: 114px;
+      height: 114px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(15,23,42,0.55) 75%);
-      border: 2px solid rgba(255, 255, 255, 0.25);
-      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+      background: rgba(250, 247, 240, 0.55);
+      border: 3px solid var(--ink);
+      box-shadow: 0 5px 0 rgba(30, 36, 44, 0.45);
       display: none;
       align-items: center;
       justify-content: center;
@@ -315,26 +383,23 @@
     }
     .touch-joystick-zone.visible { display: flex; }
     .touch-joystick-knob {
-      width: 48px;
-      height: 48px;
+      width: 46px;
+      height: 46px;
       border-radius: 50%;
-      background: linear-gradient(135deg, rgba(251, 191, 36, 0.94), rgba(245, 158, 11, 0.78));
-      border: 2px solid rgba(255, 255, 255, 0.78);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      background: var(--sunny);
+      border: 2.5px solid var(--ink);
+      box-shadow: 0 3px 0 var(--ink);
       pointer-events: none;
       transform: translate(0px, 0px);
     }
 
     /* =====================================================================
-       PROFESSIONAL STUDIO MENU OVERLAY (OPEN LIVE 3D SHOWCASE + DOCKS)
+       TOYBOX / NINTENDO-STYLE DAYLIGHT MENU (CRYSTAL-CLEAR 3D DIORAMA)
        ===================================================================== */
     #start-overlay.overlay {
       position: absolute;
       inset: 0;
-      /* Open crystal-clear 3D viewport in the center with atmospheric edge vignette */
-      background:
-        radial-gradient(ellipse 42% 58% at 50% 45%, rgba(7, 11, 20, 0.04) 0%, rgba(7, 11, 20, 0.34) 64%, rgba(5, 9, 18, 0.84) 100%),
-        linear-gradient(180deg, rgba(7, 11, 20, 0.82) 0%, rgba(7, 11, 20, 0) 20%, rgba(7, 11, 20, 0) 76%, rgba(7, 11, 20, 0.88) 100%);
+      background: linear-gradient(180deg, rgba(159, 216, 244, 0.24) 0%, rgba(159, 216, 244, 0) 24%, rgba(159, 216, 244, 0) 76%, rgba(30, 36, 44, 0.16) 100%);
       backdrop-filter: none;
       display: flex;
       flex-direction: column;
@@ -346,12 +411,12 @@
       text-align: left;
     }
 
-    /* Top Header Bar */
+    /* Top Studio Header Bar */
     .menu-top-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       flex-wrap: wrap;
       width: 100%;
     }
@@ -360,36 +425,37 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      background: var(--bg-panel);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border-subtle);
-      border-radius: 14px;
-      padding: 8px 16px 8px 11px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      background: var(--paper-bg);
+      border: 2.5px solid var(--ink);
+      border-radius: 16px;
+      padding: 7px 16px 7px 10px;
+      box-shadow: 0 4px 0 var(--ink);
     }
     .brand-emblem {
-      width: 40px;
-      height: 40px;
+      width: 38px;
+      height: 38px;
       flex-shrink: 0;
-      filter: drop-shadow(0 4px 10px rgba(249, 115, 22, 0.4));
     }
-    .brand-titles { display: flex; flex-direction: column; }
+    .brand-titles { display: flex; align-items: center; gap: 10px; }
     .title-logo {
-      font-size: 20px;
-      font-weight: 900;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-      background: linear-gradient(92deg, #fef08a 0%, #fbbf24 42%, #f97316 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      line-height: 1.1;
-    }
-    .subtitle {
-      color: #94a3b8;
-      font-size: 11.5px;
+      font-family: var(--font-display);
+      font-size: 22px;
       font-weight: 700;
-      margin-top: 2px;
-      letter-spacing: 0.25px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--coral);
+      -webkit-text-stroke: 1px var(--ink);
+      line-height: 1.05;
+    }
+    .star-counter-inline {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: #b45309;
+      padding-left: 10px;
+      border-left: 2px solid rgba(30, 36, 44, 0.18);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
 
     .menu-top-group {
@@ -399,109 +465,78 @@
       flex-wrap: wrap;
     }
     .status-chip {
-      background: var(--bg-panel);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--border-subtle);
-      border-radius: 11px;
-      padding: 7px 13px;
-      font-size: 12px;
+      background: var(--paper-bg);
+      border: 2.5px solid var(--ink);
+      border-radius: 12px;
+      padding: 7px 12px;
+      font-size: 12.5px;
       font-weight: 800;
-      color: var(--text-main);
+      color: var(--ink);
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       text-decoration: none;
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.36);
+      box-shadow: 0 4px 0 var(--ink);
       font-variant-numeric: tabular-nums;
     }
-    .status-chip.stars {
-      border-color: rgba(251, 191, 36, 0.45);
-      color: #fde047;
-      background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(15, 23, 42, 0.88));
-    }
     .status-chip.pad-on {
-      border-color: rgba(16, 185, 129, 0.5);
-      color: #6ee7b7;
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(15, 23, 42, 0.88));
+      background: #dcfce7;
+      color: #166534;
     }
     .status-chip.btn-chip {
       cursor: pointer;
-      transition: all 0.15s;
+      transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
     }
     .status-chip.btn-chip:hover {
-      background: rgba(30, 41, 59, 0.96);
-      border-color: rgba(251, 191, 36, 0.55);
-      transform: translateY(-1px);
+      background: var(--sunny);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 var(--ink);
+    }
+    .status-chip.btn-chip:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 var(--ink);
     }
 
-    /* 3-Column Asymmetric Stage Workspace */
+    /* 3-Zone Bottom Stage Workspace (leaves center 3D scene open) */
     .menu-stage-workspace {
       display: grid;
-      grid-template-columns: 350px minmax(220px, 1fr) 410px;
+      grid-template-columns: 300px minmax(140px, 1fr) 310px;
       gap: 18px;
       flex: 1;
       min-height: 0;
       align-items: end;
-      padding-top: 12px;
+      padding-top: 10px;
     }
 
     .menu-panel {
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 11px;
-      background: var(--bg-panel);
-      backdrop-filter: blur(14px);
-      border: 1px solid var(--border-subtle);
-      border-radius: 18px;
-      padding: 15px 16px 16px;
-      box-shadow: 0 24px 56px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      gap: 10px;
+      background: var(--paper-bg);
+      border: 2.5px solid var(--ink);
+      border-radius: 20px;
+      padding: 13px 14px 14px;
+      box-shadow: 0 6px 0 var(--ink), 0 18px 34px rgba(30, 36, 44, 0.22);
       max-height: 100%;
       overflow-y: auto;
     }
-    .menu-panel::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 16px;
-      right: 16px;
-      height: 3px;
-      border-radius: 0 0 3px 3px;
-      background: repeating-linear-gradient(
-        -55deg,
-        #f59e0b 0 9px,
-        #0f172a 9px 15px
-      );
-      opacity: 0.9;
-    }
 
-    .menu-section-label {
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 0.9px;
-      text-transform: uppercase;
-      color: #cbd5e1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 2px;
-    }
-
-    /* Character Variant Portrait Cards */
+    /* Character Variant Portrait Cards (NO pill clutter on perks) */
     .variant-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+      gap: 7px;
       width: 100%;
     }
     .variant-card {
       position: relative;
-      background: var(--bg-well);
-      border: 1.5px solid var(--border-subtle);
-      border-radius: 13px;
-      padding: 9px 7px 8px;
+      background: var(--paper-white);
+      border: 2px solid rgba(30, 36, 44, 0.22);
+      border-radius: 14px;
+      padding: 8px 5px 7px;
       cursor: pointer;
-      transition: all 0.18s ease;
+      transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -510,175 +545,155 @@
     }
     .variant-card:hover {
       transform: translateY(-2px);
-      background: rgba(30, 41, 59, 0.85);
-      border-color: rgba(255, 255, 255, 0.28);
+      border-color: var(--ink);
     }
     .variant-card.selected {
-      border-color: var(--gold);
-      background: linear-gradient(180deg, rgba(245, 158, 11, 0.22) 0%, rgba(15, 23, 42, 0.92) 100%);
-      box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35), 0 10px 20px rgba(245, 158, 11, 0.2);
+      border: 2.5px solid var(--ink);
+      background: var(--sunny);
+      box-shadow: 0 3px 0 var(--ink);
     }
     .variant-card.selected::after {
       content: '✓';
       position: absolute;
-      top: 5px;
-      right: 6px;
+      top: 4px;
+      right: 5px;
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      background: var(--gold);
-      color: #090d16;
-      font-size: 10px;
+      background: var(--emerald);
+      border: 1.5px solid var(--ink);
+      color: #fff;
+      font-size: 9.5px;
       font-weight: 900;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .variant-portrait {
-      width: 48px;
-      height: 48px;
+      width: 46px;
+      height: 46px;
       border-radius: 12px;
-      background: radial-gradient(circle at 50% 35%, rgba(255,255,255,0.12), rgba(0,0,0,0.28));
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: var(--paper-well);
+      border: 1.5px solid rgba(30, 36, 44, 0.16);
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
     }
-    .variant-portrait svg { width: 42px; height: 42px; }
-    .variant-info h5 { color: #fef08a; font-size: 12px; font-weight: 800; line-height: 1.15; }
-    .variant-info p { color: #94a3b8; font-size: 10px; line-height: 1.25; margin-top: 2px; }
+    .variant-portrait svg { width: 40px; height: 40px; }
+    .variant-info h5 {
+      color: var(--ink);
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    .variant-perk {
+      margin-top: 2px;
+      font-size: 9.5px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--ink-muted);
+    }
+    .variant-card.selected .variant-perk { color: var(--ink); }
 
     /* Mode Segmented Switcher */
     .mode-selector {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 4px;
-      background: var(--bg-well);
+      background: var(--paper-well);
       padding: 4px;
-      border-radius: 12px;
-      border: 1px solid var(--border-subtle);
+      border-radius: 13px;
+      border: 2px solid var(--ink);
     }
     .mode-tab {
       background: transparent;
-      border: 1px solid transparent;
-      color: #cbd5e1;
-      padding: 7px 6px;
+      border: 2px solid transparent;
+      color: var(--ink-muted);
+      padding: 6px 4px;
       border-radius: 9px;
       cursor: pointer;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .mode-tab:hover { color: var(--ink); }
+    .mode-tab.active {
+      background: var(--paper-white);
+      color: var(--ink);
+      border-color: var(--ink);
+      box-shadow: 0 2px 0 var(--ink);
+    }
+
+    /* Timer Mode Switcher */
+    .time-mode-pills {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .time-mode-pill {
+      background: var(--paper-white);
+      border: 2px solid rgba(30, 36, 44, 0.24);
+      color: var(--ink-muted);
+      padding: 6px 8px;
+      border-radius: 10px;
       font-size: 11.5px;
       font-weight: 800;
       text-align: center;
-      white-space: nowrap;
-      transition: all 0.18s;
-    }
-    .mode-tab:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
-    .mode-tab.active {
-      background: linear-gradient(135deg, #f59e0b, #ea580c);
-      color: #fff;
-      border-color: rgba(253, 224, 71, 0.45);
-      box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4);
-    }
-
-    /* Timer Mode Pill Bar */
-    .time-mode-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      background: var(--bg-well);
-      border: 1px solid var(--border-subtle);
-      padding: 5px 7px 5px 11px;
-      border-radius: 11px;
-    }
-    .time-mode-pills { display: flex; gap: 5px; }
-    .time-mode-pill {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      color: #cbd5e1;
-      padding: 5px 10px;
-      border-radius: 8px;
-      font-size: 11.5px;
-      font-weight: 800;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: all 0.14s;
     }
-    .time-mode-pill:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+    .time-mode-pill:hover { border-color: var(--ink); color: var(--ink); }
     .time-mode-pill.active {
-      background: rgba(16, 185, 129, 0.24);
-      border-color: var(--emerald);
-      color: #6ee7b7;
+      background: #dcfce7;
+      border: 2px solid var(--ink);
+      color: #14532d;
+      box-shadow: 0 2px 0 var(--ink);
     }
 
     /* LAN Co-op Lobby Box */
     .lan-panel {
-      background: linear-gradient(135deg, rgba(6, 182, 212, 0.14), rgba(15, 23, 42, 0.85));
-      border: 1.5px solid rgba(6, 182, 212, 0.45);
-      border-radius: 12px;
-      padding: 10px 12px;
+      background: #e0f2fe;
+      border: 2px solid var(--ink);
+      border-radius: 13px;
+      padding: 9px 11px;
       font-size: 12px;
+      color: var(--ink);
     }
     .lan-status-pill {
       display: inline-block;
-      padding: 2px 9px;
-      border-radius: 10px;
+      padding: 2px 8px;
+      border-radius: 8px;
       font-size: 10.5px;
       font-weight: 800;
-      background: rgba(251, 191, 36, 0.18);
-      color: var(--gold);
-      border: 1px solid rgba(251, 191, 36, 0.5);
+      background: var(--sunny);
+      color: var(--ink);
+      border: 1.5px solid var(--ink);
     }
     .lan-btn-group {
       display: flex;
-      gap: 7px;
-      margin-top: 8px;
+      gap: 6px;
+      margin-top: 7px;
       align-items: center;
     }
     .lan-action-btn {
-      background: var(--cyan);
-      color: #06121d;
-      border: none;
-      padding: 6px 11px;
+      background: var(--sky-btn);
+      color: #fff;
+      border: 2px solid var(--ink);
+      padding: 6px 10px;
       border-radius: 9px;
-      font-weight: 900;
+      font-weight: 800;
       font-size: 11.5px;
       cursor: pointer;
-      transition: transform 0.12s;
+      box-shadow: 0 2px 0 var(--ink);
     }
-    .lan-action-btn:hover { transform: translateY(-1px); }
+    .lan-action-btn:active { transform: translateY(1px); box-shadow: none; }
 
-    /* Compact Keycap Bar */
-    .quick-keys-card {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      background: var(--bg-well);
-      border: 1px solid var(--border-subtle);
-      border-radius: 11px;
-      padding: 8px 10px;
-      font-size: 11px;
-      color: #cbd5e1;
-      line-height: 1.45;
-    }
-    .quick-keys-more {
-      flex-shrink: 0;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      color: #f8fafc;
-      border-radius: 8px;
-      width: 28px;
-      height: 28px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 900;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .quick-keys-more:hover { background: rgba(251, 191, 36, 0.22); border-color: var(--gold); }
-
-    /* Center Open 3D Stage & Live Spotlight Card */
+    /* Center Open 3D Stage & Minimal Orbit Pill */
     .menu-stage-center {
       display: flex;
       flex-direction: column;
@@ -687,113 +702,202 @@
       min-width: 0;
       pointer-events: none;
     }
-    .stage-spotlight-card {
+    .stage-orbit-pill {
       pointer-events: auto;
-      width: 100%;
-      max-width: 440px;
-      background: rgba(10, 15, 27, 0.84);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-top: 3px solid var(--active-lvl-accent);
-      border-radius: 15px;
-      padding: 10px 14px;
-      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.62);
-      transition: border-color 0.25s ease;
-    }
-    .spotlight-top-row {
-      display: flex;
-      justify-content: space-between;
+      display: inline-flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 4px;
-    }
-    .spotlight-tag {
-      font-size: 10px;
-      font-weight: 900;
-      letter-spacing: 0.9px;
-      padding: 2px 8px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      color: var(--active-lvl-accent);
-      border: 1px solid color-mix(in srgb, var(--active-lvl-accent) 45%, transparent);
-    }
-    .spotlight-orbit-controls {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 10.5px;
-      font-weight: 700;
-      color: var(--text-muted);
+      background: var(--paper-bg);
+      border: 2.5px solid var(--ink);
+      border-radius: 999px;
+      padding: 5px 10px;
+      box-shadow: 0 4px 0 var(--ink);
     }
     .mini-orbit-btn {
-      width: 24px;
-      height: 24px;
-      border-radius: 7px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(255, 255, 255, 0.08);
-      color: #fff;
-      font-size: 12px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--ink);
+      background: var(--paper-white);
+      color: var(--ink);
+      font-size: 14px;
       font-weight: 900;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
     }
-    .mini-orbit-btn:hover { background: rgba(251, 191, 36, 0.25); border-color: var(--gold); }
-    .spotlight-title {
-      font-size: 15.5px;
-      font-weight: 900;
-      color: #f8fafc;
+    .mini-orbit-btn:hover { background: var(--sunny); }
+
+    /* Right Panel: Selected Map Summary + Map Picker Button + Hero Play Button */
+    .selected-map-summary {
+      position: relative;
+      background: var(--paper-white);
+      border: 2px solid var(--ink);
+      border-left: 6px solid var(--active-lvl-accent, var(--amber));
+      border-radius: 14px;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    .selected-map-summary .level-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
       margin-bottom: 3px;
+    }
+    .selected-map-summary h4 {
+      color: var(--ink);
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
     }
     .spotlight-meta {
       font-size: 11.5px;
       font-weight: 700;
-      color: #cbd5e1;
+      color: var(--ink-muted);
       font-variant-numeric: tabular-nums;
     }
     .spotlight-bonus {
-      margin-top: 4px;
+      margin-top: 3px;
       font-size: 11.5px;
       font-weight: 800;
-      color: #6ee7b7;
+      color: var(--emerald);
+    }
+    .selected-map-summary .level-card-meta {
+      margin-top: 6px;
+      padding-top: 5px;
+      border-top: 1.5px dashed rgba(30, 36, 44, 0.16);
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--ink-muted);
+      font-variant-numeric: tabular-nums;
     }
 
-    /* Right Panel: 6 Map Contract Grid + Primary Hero Play Button */
+    .btn-map-select {
+      width: 100%;
+      background: var(--paper-white);
+      color: var(--ink);
+      border: 2.5px solid var(--ink);
+      padding: 10px 16px;
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      border-radius: 13px;
+      box-shadow: 0 4px 0 var(--ink);
+    }
+    .btn-map-select:hover {
+      background: var(--sunny);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 var(--ink);
+    }
+    .btn-map-select:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 var(--ink);
+    }
+
+    /* Tactile Arcade Play CTA */
+    .btn-main {
+      width: 100%;
+      position: relative;
+      background: linear-gradient(180deg, #ff633b 0%, var(--coral) 100%);
+      color: #fff;
+      border: 2.5px solid var(--ink);
+      padding: 12px 22px;
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      border-radius: 15px;
+      cursor: pointer;
+      box-shadow: 0 5px 0 var(--ink);
+      transition: transform 0.1s, box-shadow 0.1s, filter 0.12s;
+    }
+    .btn-main:hover {
+      filter: brightness(1.05);
+      transform: translateY(-2px);
+      box-shadow: 0 7px 0 var(--ink);
+    }
+    .btn-main:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 var(--ink);
+    }
+
+    .btn-secondary {
+      background: var(--paper-white);
+      color: var(--ink);
+      border: 2.5px solid var(--ink);
+      padding: 10px 16px;
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 0 var(--ink);
+      transition: transform 0.1s, box-shadow 0.1s, background 0.12s;
+    }
+    .btn-secondary:hover {
+      background: var(--sunny);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 var(--ink);
+    }
+    .btn-secondary:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 var(--ink);
+    }
+
+    /* Map Select Grid Inside Modal */
+    .modal-card.map-select-modal-card {
+      max-width: 700px;
+      max-height: 88vh;
+      overflow-y: auto;
+    }
     .level-select-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
+      gap: 10px;
       width: 100%;
+    }
+    @media (max-width: 640px) {
+      .level-select-grid { grid-template-columns: 1fr; }
     }
     .level-card {
       position: relative;
-      background: var(--bg-well);
-      border: 1.5px solid var(--border-subtle);
-      border-top: 3px solid var(--lvl-color, var(--amber));
-      border-radius: 12px;
-      padding: 8px 10px 9px;
+      background: var(--paper-white);
+      border: 2px solid rgba(30, 36, 44, 0.25);
+      border-left: 6px solid var(--lvl-color, var(--amber));
+      border-radius: 13px;
+      padding: 9px 11px;
       cursor: pointer;
-      transition: all 0.18s ease;
+      transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
       text-align: left;
     }
     .level-card[data-level="1"] { --lvl-color: #f59e0b; }
-    .level-card[data-level="2"] { --lvl-color: #a855f7; }
+    .level-card[data-level="2"] { --lvl-color: #8b5cf6; }
     .level-card[data-level="3"] { --lvl-color: #ef4444; }
     .level-card[data-level="4"] { --lvl-color: #f97316; }
     .level-card[data-level="5"] { --lvl-color: #eab308; }
-    .level-card[data-level="6"] { --lvl-color: #06b6d4; }
+    .level-card[data-level="6"] { --lvl-color: #0284c7; }
 
     .level-card:hover {
       transform: translateY(-2px);
-      background: rgba(30, 41, 59, 0.88);
-      border-color: rgba(255, 255, 255, 0.28);
-      border-top-color: var(--lvl-color);
+      border-color: var(--ink);
+      border-left-color: var(--lvl-color);
     }
     .level-card.selected {
-      border-color: var(--lvl-color);
-      background: linear-gradient(180deg, color-mix(in srgb, var(--lvl-color) 20%, rgba(15, 23, 42, 0.94)) 0%, rgba(12, 18, 32, 0.96) 100%);
-      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45), 0 0 0 1px color-mix(in srgb, var(--lvl-color) 40%, transparent);
+      border: 2.5px solid var(--ink);
+      border-left: 6px solid var(--lvl-color);
+      background: #fef9c3;
+      box-shadow: 0 4px 0 var(--ink);
     }
     .level-card-top {
       display: flex;
@@ -802,81 +906,36 @@
       gap: 5px;
       margin-bottom: 3px;
     }
-    .level-card h4 { color: #f8fafc; font-size: 12px; font-weight: 800; line-height: 1.25; }
-    .level-card.selected h4 { color: #fef08a; }
-    .level-stars { font-size: 12px; letter-spacing: 0.5px; white-space: nowrap; }
-    .level-stars .star-lit { color: #facc15; text-shadow: 0 0 8px rgba(250, 204, 21, 0.55); }
-    .level-stars .star-dim { color: rgba(255, 255, 255, 0.18); }
-    .level-card p { font-size: 10px; color: #94a3b8; line-height: 1.3; min-height: 26px; }
+    .level-card h4 {
+      color: var(--ink);
+      font-family: var(--font-display);
+      font-size: 13.5px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .level-stars { font-size: 13px; letter-spacing: 0.5px; white-space: nowrap; }
+    .level-stars .star-lit { color: #f59e0b; }
+    .level-stars .star-dim { color: rgba(30, 36, 44, 0.2); }
+    .level-card p { font-size: 11px; color: var(--ink-muted); line-height: 1.3; min-height: 28px; font-weight: 600; }
     .level-card-meta {
       margin-top: 5px;
       padding-top: 4px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1.5px dashed rgba(30, 36, 44, 0.14);
       display: flex;
       justify-content: space-between;
-      font-size: 9.8px;
+      font-size: 10.5px;
       font-weight: 700;
-      color: #cbd5e1;
+      color: var(--ink-muted);
       gap: 4px;
       font-variant-numeric: tabular-nums;
-    }
-
-    /* Tactile 3D Arcade Buttons */
-    .btn-main {
-      width: 100%;
-      position: relative;
-      background: linear-gradient(180deg, #fbbf24 0%, #f97316 55%, #ea580c 100%);
-      color: #fff;
-      border: 1px solid rgba(254, 240, 138, 0.5);
-      padding: 13px 24px;
-      font-size: 16.5px;
-      font-weight: 900;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-      border-radius: 14px;
-      cursor: pointer;
-      box-shadow: 0 5px 0 var(--orange-deep), 0 14px 30px rgba(249, 115, 22, 0.45);
-      transition: transform 0.12s, box-shadow 0.12s, filter 0.15s;
-    }
-    .btn-main:hover {
-      filter: brightness(1.06);
-      transform: translateY(-2px);
-      box-shadow: 0 7px 0 var(--orange-deep), 0 18px 36px rgba(249, 115, 22, 0.55);
-    }
-    .btn-main:active {
-      transform: translateY(3px);
-      box-shadow: 0 2px 0 var(--orange-deep), 0 6px 14px rgba(249, 115, 22, 0.35);
-    }
-
-    .btn-secondary {
-      background: rgba(30, 41, 59, 0.85);
-      color: #f8fafc;
-      border: 1.5px solid rgba(255, 255, 255, 0.22);
-      padding: 10px 18px;
-      font-size: 13.5px;
-      font-weight: 800;
-      border-radius: 12px;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: all 0.15s;
-    }
-    .btn-secondary:hover {
-      background: rgba(51, 65, 85, 0.95);
-      border-color: rgba(251, 191, 36, 0.5);
-      transform: translateY(-1px);
     }
 
     /* Modals (Controls Guide, Pause & Settings, Game Over) */
     .overlay {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.72), rgba(5, 8, 16, 0.90));
-      backdrop-filter: blur(8px);
+      background: rgba(30, 36, 44, 0.45);
+      backdrop-filter: blur(5px);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -888,43 +947,52 @@
     }
     .modal-card {
       position: relative;
-      background: rgba(11, 17, 30, 0.96);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      border-top: 3.5px solid var(--gold);
-      border-radius: 20px;
-      padding: 22px 26px;
+      background: var(--paper-bg);
+      border: 3px solid var(--ink);
+      border-radius: 22px;
+      padding: 20px 24px;
       width: 100%;
-      max-width: 510px;
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.78);
+      max-width: 500px;
+      box-shadow: 0 8px 0 var(--ink), 0 24px 48px rgba(30, 36, 44, 0.35);
       text-align: left;
+      color: var(--ink);
     }
     .modal-card h2 {
       text-align: center;
-      font-size: 20px;
-      font-weight: 900;
-      letter-spacing: 0.4px;
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
       margin-bottom: 12px;
-      color: #fef08a;
+      color: var(--ink);
     }
     .instructions-card {
-      background: var(--bg-well);
-      border: 1px solid var(--border-subtle);
+      background: var(--paper-white);
+      border: 2px solid rgba(30, 36, 44, 0.2);
       border-radius: 14px;
-      padding: 13px 16px;
-      line-height: 1.65;
+      padding: 12px 15px;
+      line-height: 1.6;
       font-size: 13px;
-      color: #e2e8f0;
+      font-weight: 600;
+      color: var(--ink);
       text-align: left;
     }
-    .instructions-card p + p { margin-top: 8px; }
-    .instructions-card b { color: #fde047; }
+    .instructions-card p + p { margin-top: 7px; }
+    .instructions-card b { color: var(--coral); }
 
+    .pause-quick-bar {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 2px dashed rgba(30, 36, 44, 0.16);
+    }
     .setting-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 9px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px 0;
+      border-bottom: 1.5px solid rgba(30, 36, 44, 0.1);
       gap: 10px;
       font-size: 13px;
       font-weight: 700;
@@ -932,52 +1000,52 @@
     .setting-row:last-of-type { border-bottom: none; }
     .setting-controls { display: flex; align-items: center; gap: 8px; }
     .seg-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      color: #cbd5e1;
-      padding: 5px 12px;
+      background: var(--paper-white);
+      border: 2px solid var(--ink);
+      color: var(--ink);
+      padding: 5px 11px;
       border-radius: 10px;
       cursor: pointer;
       font-size: 12px;
       font-weight: 800;
-      transition: all 0.15s;
+      transition: all 0.12s;
     }
     .seg-btn.active {
-      background: var(--amber);
-      border-color: #fde047;
-      color: #090d16;
+      background: var(--sunny);
+      box-shadow: 0 2px 0 var(--ink);
     }
-    .vol-slider { width: 124px; accent-color: var(--amber); cursor: pointer; }
-    .modal-actions { display: flex; flex-direction: column; gap: 9px; margin-top: 16px; }
+    .vol-slider { width: 120px; accent-color: var(--coral); cursor: pointer; }
+    .modal-actions { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
     .modal-actions-row { display: flex; gap: 9px; }
     .modal-actions-row button { flex: 1; }
 
     /* Game Over Report Card */
     .final-stars { font-size: 40px; letter-spacing: 6px; margin: 2px 0 6px; }
-    .end-star.lit { color: #facc15; text-shadow: 0 0 20px rgba(250, 204, 21, 0.78); }
-    .end-star.dim { color: rgba(255, 255, 255, 0.16); }
+    .end-star.lit { color: #f59e0b; }
+    .end-star.dim { color: rgba(30, 36, 44, 0.18); }
     .final-record-badge {
       display: inline-block;
-      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      background: var(--coral);
       color: #fff;
-      padding: 4px 13px;
-      border-radius: 14px;
+      border: 2px solid var(--ink);
+      padding: 3px 12px;
+      border-radius: 12px;
       font-size: 11.5px;
-      font-weight: 900;
+      font-weight: 800;
       margin-bottom: 6px;
     }
     .star-breakdown {
       text-align: left;
-      background: rgba(0, 0, 0, 0.28);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 11px;
+      background: var(--paper-white);
+      border: 2px solid rgba(30, 36, 44, 0.16);
+      border-radius: 12px;
       padding: 9px 13px;
       margin: 8px 0 10px;
       font-size: 12.5px;
       line-height: 1.6;
     }
-    .star-row.ok { color: #6ee7b7; font-weight: 700; }
-    .star-row.miss { color: #94a3b8; }
+    .star-row.ok { color: var(--emerald); font-weight: 800; }
+    .star-row.miss { color: var(--ink-muted); font-weight: 600; }
     .gameover-actions {
       display: flex;
       gap: 10px;
@@ -985,19 +1053,19 @@
       width: 100%;
       max-width: 500px;
     }
-    .gameover-actions .btn-main { flex: 1.3; font-size: 15px; padding: 12px 18px; }
+    .gameover-actions .btn-main { flex: 1.3; font-size: 16px; padding: 12px 16px; }
     .gameover-actions .btn-secondary { flex: 1; }
 
     @media (hover: none) and (pointer: coarse) {
       .touch-joystick-zone { display: flex; }
     }
-    @media (max-width: 1160px) {
+    @media (max-width: 1120px) {
       .menu-stage-workspace {
-        grid-template-columns: 325px minmax(120px, 1fr) 365px;
+        grid-template-columns: 270px minmax(80px, 1fr) 280px;
         gap: 12px;
       }
     }
-    @media (max-width: 960px) {
+    @media (max-width: 920px) {
       #start-overlay.overlay { justify-content: flex-start; padding: 12px; }
       .menu-stage-workspace {
         grid-template-columns: 1fr;
@@ -1015,123 +1083,113 @@
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
     <div id="floating-text-layer"></div>
 
-    <!-- TOP IN-GAME HUD -->
+    <!-- TOP IN-GAME HUD (MINIMAL CONSOLE-STYLE INK CARDS) -->
     <div class="hud-top">
       <div class="hud-left-group">
         <div class="hud-card">
-          <span id="hud-truck-label">🚚 Trên Xe:</span>
-          <span id="truck-count" style="color: #fbbf24; font-size: 15px;">0 / 8</span>
+          <span id="hud-truck-label">🚚</span>
+          <span id="truck-count" style="color: #d97706;">0/8</span>
         </div>
 
         <div class="hud-card">
-          <span id="hud-cash-label">💰 Tiền:</span>
-          <span id="score-text" style="color: #34d399; font-size: 15px;">0 đ</span>
+          <span id="hud-cash-label">💰</span>
+          <span id="score-text" style="color: #179c52;">0đ</span>
         </div>
 
         <div class="hud-card">
           <span>⏱️</span>
-          <span id="timer-text" style="color: #38bdf8; font-size: 15px;">75s</span>
+          <span id="timer-text" style="color: #0284c7;">75s</span>
         </div>
 
-        <div class="player-hud-pill p1-pill" id="p1-hud">
-          <span>🐥 Bobi P1:</span>
-          <span id="p1-status" style="color:#fef08a;">Rảnh</span>
+        <div class="player-hud-pill p1-pill" id="p1-hud" style="display:none;">
+          <span>P1:</span>
+          <span id="p1-status">Rảnh</span>
         </div>
 
         <div class="player-hud-pill p2-pill" id="p2-hud" style="display:none;">
-          <span>🐥 Bobi P2:</span>
-          <span id="p2-status" style="color:#81ecec;">Rảnh</span>
+          <span>P2:</span>
+          <span id="p2-status">Rảnh</span>
         </div>
       </div>
 
       <div class="hud-right-group">
         <div class="hud-card rage-card">
-          <span id="hud-rage-label">😡 Chủ Nhà:</span>
+          <span id="hud-rage-label">😡</span>
           <div class="rage-bar-wrap">
             <div class="rage-bar-fill" id="rage-fill"></div>
           </div>
         </div>
 
         <div style="display:flex; gap:6px;">
-          <div class="icon-btn" id="cam-left-btn" title="Xoay Góc Nhìn Trái [Q]">↺</div>
-          <div class="icon-btn" id="cam-right-btn" title="Xoay Góc Nhìn Phải [R]">↻</div>
-          <div class="icon-btn" id="joystick-btn" title="Bật/Tắt Joystick Cảm Ứng">🕹️</div>
-          <div class="icon-btn" id="perf-btn" title="Đồ họa Đẹp / Siêu Mượt 60FPS">✨</div>
-          <div class="icon-btn" id="music-btn" title="Bật/Tắt Nhạc Nền">🎵</div>
-          <div class="icon-btn" id="sound-btn" title="Bật/Tắt Âm Thanh">🔊</div>
-          <div class="icon-btn" id="pause-btn" title="Tạm dừng & Cài đặt [Esc]">⏸️</div>
-          <div class="icon-btn" id="menu-btn" title="Về Menu">🏠</div>
+          <button class="icon-btn" id="cam-left-btn" type="button" title="Xoay Trái [Q]">↺</button>
+          <button class="icon-btn" id="cam-right-btn" type="button" title="Xoay Phải [R]">↻</button>
+          <button class="icon-btn" id="sound-btn" type="button" title="Âm Thanh">🔊</button>
+          <button class="icon-btn" id="pause-btn" type="button" title="Tạm Dừng [Esc]">⏸️</button>
         </div>
       </div>
     </div>
 
-    <!-- BONUS & PAR TIME HUD -->
-    <div class="bonus-hud-pill" id="bonus-hud-pill">🎯 -- | ⏱️ Par --s</div>
+    <!-- BONUS & COMBO HUD -->
+    <div class="bonus-hud-pill" id="bonus-hud-pill">🎯 ✓</div>
+    <div class="combo-hud-pill" id="combo-hud-pill" style="display:none;">🔥 x2</div>
 
     <!-- FEED LOG -->
     <div class="delivery-feed" id="delivery-feed"></div>
 
     <!-- VIRTUAL JOYSTICK FOR TOUCH / MOBILE -->
-    <div class="touch-joystick-zone" id="touch-joystick-zone" title="Kéo để di chuyển 360°">
+    <div class="touch-joystick-zone" id="touch-joystick-zone" title="Joystick">
       <div class="touch-joystick-knob" id="touch-joystick-knob"></div>
     </div>
 
-    <!-- BOTTOM IN-GAME CONTROLS -->
+    <!-- BOTTOM IN-GAME CONTROLS (FIRST PLAY HINT ONLY + CLEAN ACTION BUTTONS) -->
     <div class="hud-bottom">
       <div class="controls-hint" id="controls-hint-text">
-        <span id="p1-controls-label"><b>Moving Out PC:</b> <span class="kbd">WASD</span> 360°, <span class="kbd">Space</span> nhảy, <span class="kbd">Shift</span> chạy, <span class="kbd">J</span> nhặt/thả, <span class="kbd">K</span> / Chuột gồng &amp; ném, <span class="kbd">Q/R</span> xoay góc nhìn!</span>
-        <span id="p2-controls-label" style="display:none;">| <b>P2 (Xanh):</b> <span class="kbd">Mũi tên</span>, <span class="kbd">Enter/Shift phải</span> nhảy, <span class="kbd">K/Num1</span> nhặt, <span class="kbd">L/Num2</span> ném</span>
+        <span id="p1-controls-label"><span class="kbd">WASD</span> chạy • <span class="kbd">Space</span> nhảy • <span class="kbd">F</span> lướt • <span class="kbd">J</span> nhặt • <span class="kbd">K</span>/Chuột ném</span>
+        <span id="p2-controls-label" style="display:none;">| <b>P2:</b> <span class="kbd">Mũi tên</span>, <span class="kbd">Enter</span>, <span class="kbd">/</span>, <span class="kbd">K</span>, <span class="kbd">L</span></span>
+        <button class="hint-close-btn" id="hud-hint-close-btn" type="button" title="Đóng">✕</button>
       </div>
 
       <div class="action-touch-btns">
-        <button class="touch-btn btn-jump" id="touch-jump-btn">🦘 NHẢY</button>
-        <button class="touch-btn btn-grab" id="touch-grab-btn">📦 NHẶT [J]</button>
-        <button class="touch-btn btn-throw" id="touch-throw-btn">🚀 NÉM [K]</button>
+        <button class="touch-btn btn-dash" id="touch-dash-btn" type="button">💨 LƯỚT</button>
+        <button class="touch-btn btn-jump" id="touch-jump-btn" type="button">🦘 NHẢY</button>
+        <button class="touch-btn btn-grab" id="touch-grab-btn" type="button">📦 NHẶT</button>
+        <button class="touch-btn btn-throw" id="touch-throw-btn" type="button">🚀 NÉM</button>
       </div>
     </div>
 
-    <!-- START MENU OVERLAY (PROFESSIONAL 3D SHOWCASE + DOCKS) -->
+    <!-- START MENU OVERLAY (OPEN SUNLIT 3D SHOWCASE + TACTILE DOCKS) -->
     <div id="start-overlay" class="overlay">
       <!-- Top Studio Header Bar -->
       <div class="menu-top-bar">
         <div class="brand-cluster">
           <svg class="brand-emblem" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-            <rect x="4" y="6" width="56" height="52" rx="14" fill="url(#emblemBg)" stroke="#FDE047" stroke-width="2.5"/>
-            <path d="M12 38h25V22H16c-2.2 0-4 1.8-4 4v12z" fill="#FFFBEB"/>
-            <path d="M37 26h10.5l5.5 7v5H37V26z" fill="#FDE047"/>
-            <rect x="40" y="29" width="7" height="5" rx="1.2" fill="#0F172A"/>
-            <circle cx="21" cy="43" r="5" fill="#0F172A" stroke="#FDE047" stroke-width="2"/>
-            <circle cx="45" cy="43" r="5" fill="#0F172A" stroke="#FDE047" stroke-width="2"/>
-            <path d="M18 16l5-5 5 5M23 11v8" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <defs>
-              <linearGradient id="emblemBg" x1="4" y1="6" x2="60" y2="58" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#F59E0B"/>
-                <stop offset="1" stop-color="#EA580C"/>
-              </linearGradient>
-            </defs>
+            <rect x="4" y="6" width="56" height="52" rx="14" fill="#FFD84D" stroke="#1E242C" stroke-width="3.5"/>
+            <path d="M12 39h25V23H16c-2.2 0-4 1.8-4 4v12z" fill="#FFFFFF" stroke="#1E242C" stroke-width="2.5"/>
+            <path d="M37 27h10.5l5.5 7v5H37V27z" fill="#EF4F27" stroke="#1E242C" stroke-width="2.5"/>
+            <rect x="40" y="30" width="7" height="5" rx="1.2" fill="#BAE6FD" stroke="#1E242C" stroke-width="1.5"/>
+            <circle cx="21" cy="43" r="5" fill="#1E242C"/>
+            <circle cx="45" cy="43" r="5" fill="#1E242C"/>
+            <path d="M18 17l5-5 5 5M23 12v8" stroke="#1E242C" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <div class="brand-titles">
-            <div class="title-logo" id="logo-title">MOVING CHAOS 3D • DỌN NHÀ SIÊU TỐC</div>
-            <p class="subtitle" id="logo-sub">Phiên Bản 2.5D Isometric • Mascot Hạt Đậu Bobi &amp; 6 Bản Đồ Độc Bản</p>
+            <div class="title-logo" id="logo-title">MOVING CHAOS</div>
+            <span class="star-counter-inline" id="total-stars-pill">★ 0/18</span>
           </div>
         </div>
 
         <div class="menu-top-group">
-          <span class="status-chip stars" id="total-stars-pill">⭐ 0 / 18 Sao</span>
-          <span class="status-chip" id="gamepad-status-pill">🎮 Chưa nối tay cầm</span>
-          <button class="status-chip btn-chip" id="controls-toggle-btn">🎮 Điều Khiển</button>
-          <button class="status-chip btn-chip" id="lang-toggle-btn">🇻🇳 Tiếng Việt</button>
-          <button class="status-chip btn-chip" id="menu-settings-btn">⚙️ Cài Đặt</button>
-          <a href="./moving_chaos_2d.html" class="status-chip btn-chip" id="link-2d-mode">🕹️ Bản 2D Cổ điển</a>
+          <span class="status-chip" id="gamepad-status-pill" style="display:none;">🎮 0</span>
+          <button class="status-chip btn-chip" id="controls-toggle-btn" type="button">📖 Hướng dẫn</button>
+          <button class="status-chip btn-chip" id="lang-toggle-btn" type="button">🇻🇳 VI</button>
+          <button class="status-chip btn-chip" id="menu-settings-btn" type="button" title="Cài đặt">⚙️</button>
+          <a href="./moving_chaos_2d.html" class="status-chip btn-chip" id="link-2d-mode">2D</a>
         </div>
       </div>
 
-      <!-- Main 3-Zone Open Showcase Workspace -->
+      <!-- Bottom 3-Zone Workspace -->
       <div class="menu-stage-workspace">
-        <!-- LEFT DOCK: Bobi Variant, Mode, Timer, LAN, Quick Keys -->
+        <!-- LEFT DOCK: Bobi Character + Mode + Timer + LAN -->
         <div class="menu-panel">
-          <div class="menu-section-label" id="sec-char-mode-label">1. Chọn Bobi &amp; Chế Độ</div>
-
           <div class="variant-grid">
             <div class="variant-card selected" data-variant="base">
               <div class="variant-portrait">
@@ -1151,8 +1209,8 @@
                 </svg>
               </div>
               <div class="variant-info">
-                <h5 id="var-base-title">Base Bobi</h5>
-                <p id="var-base-desc">Quần yếm Denim &amp; Nơ đỏ</p>
+                <h5 id="var-base-title">Bobi</h5>
+                <div class="variant-perk" id="var-base-perk">+12% Tốc &amp; Ném</div>
               </div>
             </div>
 
@@ -1175,7 +1233,7 @@
               </div>
               <div class="variant-info">
                 <h5 id="var-builder-title">Công Nhân</h5>
-                <p id="var-builder-desc">Phản quang &amp; Đèn LED</p>
+                <div class="variant-perk" id="var-builder-perk">Vác nặng • Ít choáng</div>
               </div>
             </div>
 
@@ -1195,115 +1253,93 @@
                 </svg>
               </div>
               <div class="variant-info">
-                <h5 id="var-chef-title">Chef Bobi</h5>
-                <p id="var-chef-desc">Tạp dề &amp; Mũ đầu bếp</p>
+                <h5 id="var-chef-title">Đầu Bếp</h5>
+                <div class="variant-perk" id="var-chef-perk">Bám dầu • Đỡ vỡ</div>
               </div>
             </div>
           </div>
 
           <div class="mode-selector">
-            <div class="mode-tab active" data-mode="SOLO" id="mode-tab-solo">👤 1 Người</div>
-            <div class="mode-tab" data-mode="LOCAL_2P" id="mode-tab-local2p">👥 2P Chung Phím</div>
-            <div class="mode-tab" data-mode="LAN_COOP" id="mode-tab-lan">🌐 Co-op LAN</div>
+            <div class="mode-tab active" data-mode="SOLO" id="mode-tab-solo">👤 1P</div>
+            <div class="mode-tab" data-mode="LOCAL_2P" id="mode-tab-local2p">👥 2P</div>
+            <div class="mode-tab" data-mode="LAN_COOP" id="mode-tab-lan">🌐 LAN</div>
           </div>
 
-          <div class="time-mode-bar">
-            <span id="time-mode-label" style="font-size:11px; color:#cbd5e1; font-weight:800;">⏱️ Thời gian:</span>
-            <div class="time-mode-pills">
-              <div class="time-mode-pill active" data-unlimited="false" id="time-pill-std">⏳ Tiêu chuẩn</div>
-              <div class="time-mode-pill" data-unlimited="true" id="time-pill-unl">♾️ Unlimited Time</div>
-            </div>
+          <div class="time-mode-pills">
+            <div class="time-mode-pill active" data-unlimited="false" id="time-pill-std">⏳ Tính giờ</div>
+            <div class="time-mode-pill" data-unlimited="true" id="time-pill-unl">♾️ Thoải mái</div>
           </div>
 
           <!-- LAN CO-OP LOBBY PANEL -->
           <div class="lan-panel" id="lan-panel" style="display: none;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-              <b id="lan-header-text">🌐 PHÒNG CO-OP WI-FI / LAN</b>
+              <b id="lan-header-text">🌐 LAN</b>
               <span class="lan-status-pill" id="lan-status-text">Sẵn sàng</span>
             </div>
-            <div style="margin-top:4px; color:#cbd5e1; font-size:11px;" id="lan-guide-text"></div>
+            <div style="margin-top:4px; color:#334155; font-size:11px; font-weight:600;" id="lan-guide-text"></div>
             <div class="lan-btn-group">
-              <button class="lan-action-btn" id="btn-lan-host">🎮 Tạo Phòng</button>
-              <button class="lan-action-btn" id="btn-lan-join" style="background:#f59e0b;">📱 Vào Phòng</button>
-              <input type="text" id="lan-room-input" value="room1" style="background:#1e293b; border:1px solid #475569; color:#fff; padding:5px 9px; border-radius:8px; width:82px; font-size:12px; font-weight:700;">
+              <button class="lan-action-btn" id="btn-lan-host" type="button">Tạo Phòng</button>
+              <button class="lan-action-btn" id="btn-lan-join" type="button" style="background:#f59e0b; color:#1e242c;">Vào Phòng</button>
+              <input type="text" id="lan-room-input" value="room1" style="background:#ffffff; border:2px solid #1e242c; color:#1e242c; padding:5px 8px; border-radius:8px; width:76px; font-size:12px; font-weight:800;">
             </div>
-          </div>
-
-          <div class="quick-keys-card">
-            <div id="quick-keys-strip"><b>Phím nhanh:</b> <span class="kbd">WASD</span> Đi • <span class="kbd">Space</span> Nhảy • <span class="kbd">J</span> Nhặt • <span class="kbd">K</span> Ném • <span class="kbd">Q/R</span> Xoay</div>
-            <button class="quick-keys-more" id="controls-quick-more-btn" title="Xem chi tiết phím & tay cầm">?</button>
           </div>
         </div>
 
-        <!-- CENTER OPEN 3D DIORAMA SHOWCASE -->
+        <!-- CENTER OPEN 3D DIORAMA SHOWCASE (COMPACT CAMERA ROTATE) -->
         <div class="menu-stage-center">
-          <div class="stage-spotlight-card" id="stage-spotlight-card">
-            <div class="spotlight-top-row">
-              <span class="spotlight-tag" id="spotlight-tag">HỢP ĐỒNG #1</span>
-              <div class="spotlight-orbit-controls">
-                <span id="stage-cam-hint">🎥 Xoay mô hình 3D</span>
-                <button class="mini-orbit-btn" id="menu-cam-left" title="Xoay trái">↺</button>
-                <button class="mini-orbit-btn" id="menu-cam-right" title="Xoay phải">↻</button>
-              </div>
-            </div>
-            <div class="spotlight-title" id="spotlight-title">🏠 1. Nhà Phố Khởi Động</div>
-            <div class="spotlight-meta" id="spotlight-meta">📦 8 món • ⏱️ 80s • ⏱️ Par 55s</div>
-            <div class="spotlight-bonus" id="spotlight-bonus">🎯 Mục tiêu phụ: Không làm vỡ cửa kính</div>
+          <div class="stage-orbit-pill">
+            <button class="mini-orbit-btn" id="menu-cam-left" type="button" title="Xoay trái">↺</button>
+            <span id="stage-cam-hint" style="font-size:11.5px; font-weight:800; color:#1e242c;">Xoay 3D</span>
+            <button class="mini-orbit-btn" id="menu-cam-right" type="button" title="Xoay phải">↻</button>
           </div>
         </div>
 
-        <!-- RIGHT DOCK: 6 Map Contracts + Hero Launch CTA -->
+        <!-- RIGHT DOCK: Selected Map Card + Chọn map Button + Hero Launch CTA -->
         <div class="menu-panel">
-          <div class="menu-section-label" id="sec-levels-label">2. Chọn Bản Đồ Dọn Nhà (6 Màn)</div>
-
-          <div class="level-select-grid" id="level-select-grid">
-            <div class="level-card selected" data-level="1">
-              <div class="level-card-top"><h4>🏠 1. Nhà Phố Khởi Động</h4><span class="level-stars">☆☆☆</span></div>
-              <p>8 món • Hàng rào ném qua, 1 cửa kính &amp; bạt lò xo.</p>
-              <div class="level-card-meta"><span>⏱️ Par 55s</span><span>Chưa hoàn thành</span></div>
+          <div class="selected-map-summary" id="selected-map-summary">
+            <div class="level-card-top">
+              <h4 id="selected-map-name">🏠 1. Nhà Phố</h4>
+              <span class="level-stars" id="selected-map-stars">☆☆☆</span>
             </div>
-            <div class="level-card" data-level="2">
-              <div class="level-card-top"><h4>👻 2. Biệt Thự Ma Ám</h4><span class="level-stars">☆☆☆</span></div>
-              <p>10 món • Xe đậu dưới, Ma tuần tra &amp; Công tắc mở cửa.</p>
-              <div class="level-card-meta"><span>⏱️ Par 68s</span><span>Chưa hoàn thành</span></div>
-            </div>
-            <div class="level-card" data-level="3">
-              <div class="level-card-top"><h4>🚗 3. Đại Lộ Giờ Cao Điểm</h4><span class="level-stars">☆☆☆</span></div>
-              <p>12 món • 2 nhà đối diện phố, Xe hơi chạy &amp; Đèn đỏ.</p>
-              <div class="level-card-meta"><span>⏱️ Par 74s</span><span>Chưa hoàn thành</span></div>
-            </div>
-            <div class="level-card" data-level="4">
-              <div class="level-card-top"><h4>🍳 4. Nhà Hàng Bếp Lửa</h4><span class="level-stars">☆☆☆</span></div>
-              <p>12 món • Sàn dầu trơn, Quầy bar ném qua &amp; Đầu bếp.</p>
-              <div class="level-card-meta"><span>⏱️ Par 72s</span><span>Chưa hoàn thành</span></div>
-            </div>
-            <div class="level-card" data-level="5">
-              <div class="level-card-top"><h4>🏗️ 5. Công Trường Thang Nâng</h4><span class="level-stars">☆☆☆</span></div>
-              <p>14 món • Thang nâng 3 tầng, Hố sâu, Cầu rút &amp; Quạt gió.</p>
-              <div class="level-card-meta"><span>⏱️ Par 84s</span><span>Chưa hoàn thành</span></div>
-            </div>
-            <div class="level-card" data-level="6">
-              <div class="level-card-top"><h4>🌀 6. Đại Kho Băng Chuyền</h4><span class="level-stars">☆☆☆</span></div>
-              <p>16 món • Băng chuyền đảo chiều, Cửa kho, Cầu rút &amp; Robot.</p>
-              <div class="level-card-meta"><span>⏱️ Par 92s</span><span>Chưa hoàn thành</span></div>
+            <div id="spotlight-meta" class="spotlight-meta">8 món • 80s • Par 55s</div>
+            <div id="spotlight-bonus" class="spotlight-bonus">🎯 Không vỡ kính</div>
+            <div class="level-card-meta">
+              <span id="selected-map-record">Chưa chơi</span>
             </div>
           </div>
 
-          <button class="btn-main" id="start-play-btn">🚚 BẮT ĐẦU DỌN NHÀ 3D!</button>
+          <button class="btn-secondary btn-map-select" id="open-map-select-btn" type="button">🗺️ Chọn map</button>
+
+          <button class="btn-main" id="start-play-btn" type="button">CHƠI NGAY</button>
         </div>
       </div>
     </div>
 
-    <!-- CONTROLS GUIDE MODAL -->
-    <div id="controls-modal" class="overlay" style="display: none; z-index: 28;">
-      <div class="modal-card" style="max-width: 560px;">
-        <h2 id="controls-modal-title">🎮 HƯỚNG DẪN PHÍM &amp; TAY CẦM</h2>
-        <div class="instructions-card" id="mode-instruction">
-          <p>🎮 <b>Chuẩn Moving Out (2 Tay Rộng Rãi):</b> Tay trái <span class="kbd">WASD</span> đi 360° • <span class="kbd">Space</span> nhảy • <span class="kbd">Shift</span> chạy | Tay phải <span class="kbd">J</span> nhặt/thả • <span class="kbd">K</span> (hoặc Chuột) gồng &amp; ném!</p>
-          <p>🎥 <b>Xoay Góc Nhìn 3D:</b> Bấm <span class="kbd">Q</span> / <span class="kbd">R</span> (hoặc ↺ ↻) • Lăn chuột Zoom • Hỗ trợ thẻ P1/P2 trên đầu ở chế độ Co-op!</p>
+    <!-- MAP SELECT MODAL (HIDDEN UNTIL USER CLICKS 'Chọn map') -->
+    <div id="map-select-modal" class="overlay" style="display: none; z-index: 28;">
+      <div class="modal-card map-select-modal-card">
+        <h2 id="map-select-modal-title">🗺️ CHỌN BẢN ĐỒ</h2>
+        <div class="level-select-grid" id="level-select-grid">
+          <div class="level-card selected" data-level="1"></div>
+          <div class="level-card" data-level="2"></div>
+          <div class="level-card" data-level="3"></div>
+          <div class="level-card" data-level="4"></div>
+          <div class="level-card" data-level="5"></div>
+          <div class="level-card" data-level="6"></div>
         </div>
         <div class="modal-actions">
-          <button class="btn-main" id="controls-close-btn" style="padding:10px 20px; font-size:14.5px;">✅ ĐÓNG</button>
+          <button class="btn-main" id="map-select-close-btn" type="button" style="padding:10px 20px; font-size:15px;">ĐÓNG</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- UNIFIED GUIDE MODAL (ALL INSTRUCTIONS IN ONE PLACE) -->
+    <div id="controls-modal" class="overlay" style="display: none; z-index: 28;">
+      <div class="modal-card" style="max-width: 580px; max-height: 88vh; overflow-y: auto;">
+        <h2 id="controls-modal-title">📖 HƯỚNG DẪN CHƠI</h2>
+        <div class="instructions-card" id="guide-modal-body"></div>
+        <div class="modal-actions">
+          <button class="btn-main" id="controls-close-btn" type="button" style="padding:10px 20px; font-size:15px;">ĐÓNG</button>
         </div>
       </div>
     </div>
@@ -1311,19 +1347,27 @@
     <!-- PAUSE & SETTINGS OVERLAY -->
     <div id="pause-overlay" class="overlay" style="display: none; z-index: 30;">
       <div class="modal-card">
-        <h2 id="pause-title">⏸️ TẠM DỪNG &amp; CÀI ĐẶT</h2>
-        <p id="pause-lan-note" style="display:none; font-size:11.5px; color:#38bdf8; text-align:center; margin-bottom:10px;"></p>
+        <h2 id="pause-title">⏸️ TẠM DỪNG</h2>
+        <p id="pause-lan-note" style="display:none; font-size:11.5px; color:#0284c7; font-weight:700; text-align:center; margin-bottom:10px;"></p>
+
+        <div class="pause-quick-bar">
+          <button class="icon-btn" id="music-btn" type="button" title="Nhạc nền">🎵</button>
+          <button class="icon-btn" id="perf-btn" type="button" title="Đồ họa Đẹp / Mượt">✨</button>
+          <button class="icon-btn" id="joystick-btn" type="button" title="Joystick cảm ứng">🕹️</button>
+          <button class="icon-btn" id="hud-guide-btn" type="button" title="Hướng dẫn">📖</button>
+          <button class="icon-btn" id="menu-btn" type="button" title="Về Menu">🏠</button>
+        </div>
 
         <div class="setting-row">
-          <span id="set-lang-label">🌐 Ngôn ngữ / Language</span>
+          <span id="set-lang-label">🌐 Ngôn ngữ</span>
           <div class="setting-controls">
-            <button class="seg-btn active" id="set-lang-vi">Tiếng Việt</button>
-            <button class="seg-btn" id="set-lang-en">English</button>
+            <button class="seg-btn active" id="set-lang-vi" type="button">Tiếng Việt</button>
+            <button class="seg-btn" id="set-lang-en" type="button">English</button>
           </div>
         </div>
 
         <div class="setting-row">
-          <span id="set-bgm-label">🎵 Âm lượng Nhạc nền</span>
+          <span id="set-bgm-label">🎵 Nhạc nền</span>
           <div class="setting-controls">
             <input type="range" min="0" max="100" value="70" class="vol-slider" id="bgm-vol-slider">
             <span id="bgm-vol-val" style="width:36px; text-align:right;">70%</span>
@@ -1331,7 +1375,7 @@
         </div>
 
         <div class="setting-row">
-          <span id="set-sfx-label">🔊 Âm lượng Hiệu ứng</span>
+          <span id="set-sfx-label">🔊 Hiệu ứng</span>
           <div class="setting-controls">
             <input type="range" min="0" max="100" value="85" class="vol-slider" id="sfx-vol-slider">
             <span id="sfx-vol-val" style="width:36px; text-align:right;">85%</span>
@@ -1339,31 +1383,31 @@
         </div>
 
         <div class="setting-row">
-          <span id="set-gfx-label">✨ Chất lượng Đồ họa</span>
+          <span id="set-gfx-label">✨ Đồ họa</span>
           <div class="setting-controls">
-            <button class="seg-btn active" id="set-gfx-btn">Đẹp (Bóng đổ ON)</button>
+            <button class="seg-btn active" id="set-gfx-btn" type="button">Đẹp</button>
           </div>
         </div>
 
         <div class="setting-row">
-          <span id="set-rumble-label">📳 Rung Tay cầm (Haptics)</span>
+          <span id="set-rumble-label">📳 Rung tay cầm</span>
           <div class="setting-controls">
-            <button class="seg-btn active" id="set-rumble-btn">BẬT</button>
+            <button class="seg-btn active" id="set-rumble-btn" type="button">BẬT</button>
           </div>
         </div>
 
         <div class="setting-row">
           <span id="set-fs-label">⛶ Toàn màn hình</span>
           <div class="setting-controls">
-            <button class="seg-btn" id="set-fs-btn">Bật / Thoát Fullscreen</button>
+            <button class="seg-btn" id="set-fs-btn" type="button">Bật / Tắt</button>
           </div>
         </div>
 
         <div class="modal-actions">
-          <button class="btn-main" id="pause-resume-btn" style="padding:10px 20px; font-size:15px;">▶️ TIẾP TỤC CHƠI</button>
+          <button class="btn-main" id="pause-resume-btn" type="button" style="padding:10px 20px; font-size:15px;">▶️ TIẾP TỤC</button>
           <div class="modal-actions-row" id="pause-match-actions">
-            <button class="btn-secondary" id="pause-restart-btn" style="padding:8px 14px; font-size:13px;">🔄 CHƠI LẠI MÀN NÀY</button>
-            <button class="btn-secondary" id="pause-menu-btn" style="padding:8px 14px; font-size:13px;">🏠 VỀ MENU CHÍNH</button>
+            <button class="btn-secondary" id="pause-restart-btn" type="button" style="padding:8px 14px; font-size:13px;">🔄 Chơi lại</button>
+            <button class="btn-secondary" id="pause-menu-btn" type="button" style="padding:8px 14px; font-size:13px;">🏠 Menu</button>
           </div>
         </div>
       </div>
@@ -1371,23 +1415,22 @@
 
     <!-- GAME OVER OVERLAY -->
     <div id="gameover-overlay" class="overlay" style="display: none;">
-      <div class="title-logo" id="end-title" style="font-size:30px; margin-bottom:4px;">HẾT GIỜ DỌN NHÀ! 🚚</div>
-      <p class="subtitle" id="end-sub" style="margin-bottom:14px; font-size:13.5px;">Chuyến xe dọn nhà đã chính thức lăn bánh!</p>
-
-      <div class="modal-card" style="text-align: center; max-width: 500px;">
+      <div class="modal-card" style="text-align: center; max-width: 480px;">
+        <h2 id="end-title" style="margin-bottom:2px; color:var(--coral);">HẾT GIỜ! 🚚</h2>
+        <p id="end-sub" style="margin-bottom:8px; font-size:13px; color:var(--ink-muted); font-weight:700;"></p>
         <div class="final-stars" id="final-stars">★ ★ ★</div>
         <div class="final-record-badge" id="final-record-badge" style="display:none;">🏆 KỶ LỤC MỚI!</div>
-        <p id="end-earnings-label" style="font-size: 12.5px; color: #94a3b8; font-weight:800; letter-spacing:0.6px;">TỔNG TIỀN CÔNG &amp; TIỀN BOA</p>
-        <p id="final-earnings" style="font-size: 32px; font-weight: 900; color: #34d399; margin: 4px 0 8px;">0 VNĐ</p>
+        <p id="end-earnings-label" style="font-size: 11.5px; color: var(--ink-muted); font-weight:800; letter-spacing:0.6px;">TỔNG TIỀN</p>
+        <p id="final-earnings" style="font-family:var(--font-display); font-size: 32px; font-weight: 700; color: var(--emerald); margin: 2px 0 8px;">0 VNĐ</p>
         <div class="star-breakdown" id="final-star-breakdown"></div>
-        <p id="final-stats" style="font-size: 13.5px; color: #fde047; line-height: 1.55;"></p>
-        <p id="final-rank" style="margin-top: 10px; font-size: 16.5px; font-weight: 900; color: #fbbf24;"></p>
-        <p id="final-quote" style="margin-top: 4px; font-style: italic; font-size: 12.5px; color: #cbd5e1;"></p>
+        <p id="final-stats" style="font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.5;"></p>
+        <p id="final-rank" style="margin-top: 8px; font-family:var(--font-display); font-size: 17px; font-weight: 700; color: #b45309;"></p>
+        <p id="final-quote" style="margin-top: 4px; font-style: italic; font-size: 12px; color: var(--ink-muted);"></p>
       </div>
 
       <div class="gameover-actions">
-        <button class="btn-main" id="replay-btn">🔄 DỌN LẠI HIỆP NỮA</button>
-        <button class="btn-secondary" id="menu-back-btn">🏠 CHỌN MÀN KHÁC</button>
+        <button class="btn-main" id="replay-btn" type="button">🔄 CHƠI LẠI</button>
+        <button class="btn-secondary" id="menu-back-btn" type="button">🏠 MENU</button>
       </div>
     </div>
   </div>

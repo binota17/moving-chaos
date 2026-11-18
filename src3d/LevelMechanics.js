@@ -84,6 +84,7 @@ export class LevelMechanics {
       hz.rotY = 0;
       hz.hornCd = 0;
       hz.stopped = false;
+      hz.stunTimer = 0;
       if (hz.type === 'car') {
         hz._period = Math.max(1, hz.to - hz.from);
       } else {
@@ -204,8 +205,9 @@ export class LevelMechanics {
     this._computeElevators();
 
     for (const h of this.hazards) {
+      if (h.stunTimer > 0) h.stunTimer = Math.max(0, h.stunTimer - dt);
       h.stopped = !!(h.stopSwitchId && this.isSwitchActive(h.stopSwitchId));
-      if (!h.stopped) h.phase = (h.phase + h.speed * dt) % h._period;
+      if (!h.stopped && !(h.stunTimer > 0)) h.phase = (h.phase + h.speed * dt) % h._period;
       if (h.hornCd > 0) h.hornCd -= dt;
     }
     this._computeHazards();
@@ -376,11 +378,28 @@ export class LevelMechanics {
         const halfZ = (alongZ ? CAR_HALF_LEN : CAR_HALF_WIDTH) + radius;
         if (Math.abs(entity.x - h.x) < halfX && Math.abs(entity.z - h.z) < halfZ) return h;
       } else {
-        if (h.stopped || entity.y > 1.6) continue;
+        if (h.stopped || h.stunTimer > 0 || entity.y > 1.6) continue;
         if (Math.hypot(entity.x - h.x, entity.z - h.z) < h.radius + radius) return h;
       }
     }
     return null;
+  }
+
+  /** Temporarily stuns a nearby patrolling NPC/robot when slapped or dashed into. */
+  stunPatrolNear(x, y, z, maxDist = 1.35, duration = 2.0) {
+    if (y > 1.8) return null;
+    let best = null;
+    let bestDist = maxDist;
+    for (const h of this.hazards) {
+      if (h.type === 'car' || h.stunTimer > 0) continue;
+      const d = Math.hypot(x - h.x, z - h.z);
+      if (d <= bestDist) {
+        bestDist = d;
+        best = h;
+      }
+    }
+    if (best) best.stunTimer = duration;
+    return best;
   }
 
   // ---------------------------------------------------------------------
@@ -390,7 +409,8 @@ export class LevelMechanics {
     return {
       s: this.switches.map((s) => (s.active ? 1 : 0)),
       e: this.elevators.map((e) => r2(e.phase)),
-      h: this.hazards.map((h) => r2(h.phase))
+      h: this.hazards.map((h) => r2(h.phase)),
+      st: this.hazards.map((h) => (h.stunTimer > 0 ? r2(h.stunTimer) : 0))
     };
   }
 
@@ -417,6 +437,7 @@ export class LevelMechanics {
     };
     if (Array.isArray(st.e)) st.e.forEach((v, i) => this.elevators[i] && blend(this.elevators[i], v));
     if (Array.isArray(st.h)) st.h.forEach((v, i) => this.hazards[i] && blend(this.hazards[i], v));
+    if (Array.isArray(st.st)) st.st.forEach((v, i) => { if (this.hazards[i] && Number.isFinite(v)) this.hazards[i].stunTimer = v; });
     this._computeElevators();
     this._computeHazards();
     return changed;

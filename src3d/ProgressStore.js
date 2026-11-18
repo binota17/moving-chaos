@@ -12,7 +12,8 @@ const DEFAULT_SETTINGS = {
   bgmEnabled: true,
   sfxEnabled: true,
   rumbleEnabled: true,
-  highQuality: null // null = auto detect device
+  highQuality: null, // null = auto detect device
+  guideSeen: false
 };
 
 function safeReadJson(key, fallback) {
@@ -43,7 +44,8 @@ export function loadSettings() {
     bgmEnabled: typeof saved.bgmEnabled === 'boolean' ? saved.bgmEnabled : DEFAULT_SETTINGS.bgmEnabled,
     sfxEnabled: typeof saved.sfxEnabled === 'boolean' ? saved.sfxEnabled : DEFAULT_SETTINGS.sfxEnabled,
     rumbleEnabled: typeof saved.rumbleEnabled === 'boolean' ? saved.rumbleEnabled : DEFAULT_SETTINGS.rumbleEnabled,
-    highQuality: typeof saved.highQuality === 'boolean' ? saved.highQuality : null
+    highQuality: typeof saved.highQuality === 'boolean' ? saved.highQuality : null,
+    guideSeen: typeof saved.guideSeen === 'boolean' ? saved.guideSeen : false
   };
 }
 

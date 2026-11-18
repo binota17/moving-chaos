@@ -1,0 +1,16 @@
+{
+  "name": "moving-chaos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Moving Chaos 3D & 2D Co-op Physics Moving Game",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node -e \"const fs=require('fs'),path=require('path'),cp=require('child_process');function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory()&&!['node_modules','vendor','.git','CharacterProduction'].includes(e.name))walk(p);else if(e.isFile()&&p.endsWith('.js'))cp.execFileSync(process.execPath,['--check',p],{stdio:'inherit'});}}walk('.');\"",
+    "lint": "node -e \"const fs=require('fs'),path=require('path'),cp=require('child_process');function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory()&&!['node_modules','vendor','.git','CharacterProduction'].includes(e.name))walk(p);else if(e.isFile()&&p.endsWith('.js'))cp.execFileSync(process.execPath,['--check',p],{stdio:'inherit'});}}walk('.');\""
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

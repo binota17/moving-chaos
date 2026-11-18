@@ -309,50 +309,83 @@ class GameApp {
 
         const p2Label = document.getElementById('p2-controls-label');
         const lanPanel = document.getElementById('lan-panel');
-        const instruction = document.getElementById('mode-instruction');
 
         if (this.gameMode === 'SOLO') {
           if (p2Label) p2Label.style.display = 'none';
           if (lanPanel) lanPanel.style.display = 'none';
-          if (instruction) {
-            instruction.innerHTML = `
-              <p>🎯 <b>Chế độ 1 Người:</b> Quăng đồ qua cửa sổ xuống thùng xe tải hoặc nảy bạt lò xo!</p>
-              <p>🪟 <b>Kính Cửa Sổ:</b> Ném đồ mạnh sẽ <b>LÀM VỠ TOANG KÍNH</b> để mở đường thông thoáng!</p>
-              <p>💫 <b>Đè bẹp & Choáng:</b> Đồ nặng rơi trúng đầu sẽ khiến nhân vật <b>bẹp dí và choáng váng</b>!</p>
-            `;
-          }
         } else if (this.gameMode === 'LOCAL_2P') {
           if (p2Label) p2Label.style.display = 'inline';
           if (lanPanel) lanPanel.style.display = 'none';
-          if (instruction) {
-            instruction.innerHTML = `
-              <p>👥 <b>Chế độ 2 Người (1 Bàn Phím):</b></p>
-              <p>👉 <b>Thợ Cả Tèo (Xanh):</b> <span class="kbd">A/D</span> chạy, <span class="kbd">W</span> nhảy, <span class="kbd">E</span> bê, <span class="kbd">Space/J</span> ném</p>
-              <p>👉 <b>Thợ Phụ Tí (Cam):</b> <span class="kbd">Mũi tên ←/→</span> chạy, <span class="kbd">↑</span> nhảy, <span class="kbd">K</span> bê, <span class="kbd">L</span> ném</p>
-              <p>🤝 <b>Khiêng Chung Đồ Nặng:</b> Cả 2 cùng đứng gần Piano/Két sắt bấm Bê để hợp lực ném siêu xa!</p>
-            `;
-          }
         } else if (this.gameMode === 'LAN_COOP') {
           if (p2Label) p2Label.style.display = 'inline';
           if (lanPanel) lanPanel.style.display = 'block';
-          if (instruction) {
-            instruction.innerHTML = `
-              <p>🌐 <b>Chế độ Co-op Mạng LAN:</b> 2 máy kết nối chung mạng Wi-Fi dọn nhà cùng nhau!</p>
-              <p>👉 <b>Máy 1:</b> Bấm <b>Tạo Phòng</b> để làm Host.</p>
-              <p>👉 <b>Máy 2:</b> Mở trình duyệt gõ địa chỉ IP LAN hiển thị trên terminal, rồi bấm <b>Vào Phòng</b>!</p>
-            `;
-          }
           this.checkLANStatus();
         }
       });
     });
 
-    // Level selector
+    // Unified Guide modal & first-play HUD hint
+    const guideModal = document.getElementById('guide-modal');
+    const openGuideModal = () => {
+      if (guideModal) guideModal.style.display = 'flex';
+    };
+    const closeGuideModal = () => {
+      if (guideModal) guideModal.style.display = 'none';
+    };
+    const openGuideBtn = document.getElementById('open-guide-btn');
+    const hudGuideBtn = document.getElementById('hud-guide-btn');
+    const closeGuideBtn = document.getElementById('guide-close-btn');
+    if (openGuideBtn) openGuideBtn.addEventListener('click', openGuideModal);
+    if (hudGuideBtn) hudGuideBtn.addEventListener('click', openGuideModal);
+    if (closeGuideBtn) closeGuideBtn.addEventListener('click', closeGuideModal);
+    if (guideModal) {
+      guideModal.addEventListener('click', (e) => {
+        if (e.target === guideModal) closeGuideModal();
+      });
+    }
+
+    const hintCloseBtn = document.getElementById('hud-hint-close-btn');
+    if (hintCloseBtn) {
+      hintCloseBtn.addEventListener('click', () => {
+        const hintEl = document.getElementById('controls-hint-text');
+        if (hintEl) hintEl.classList.remove('is-first-play');
+        try { localStorage.setItem('moving_chaos_2d_guide_seen_v1', '1'); } catch { /* ignore */ }
+      });
+    }
+
+    // Map select modal & Level selector
+    const mapModal = document.getElementById('map-select-modal');
+    const openMapBtn = document.getElementById('open-map-select-btn');
+    const closeMapBtn = document.getElementById('map-select-close-btn');
+    const closeMapModal = () => {
+      if (mapModal) mapModal.style.display = 'none';
+    };
+    if (openMapBtn) {
+      openMapBtn.addEventListener('click', () => {
+        if (mapModal) mapModal.style.display = 'flex';
+      });
+    }
+    if (closeMapBtn) {
+      closeMapBtn.addEventListener('click', closeMapModal);
+    }
+    if (mapModal) {
+      mapModal.addEventListener('click', (e) => {
+        if (e.target === mapModal) closeMapModal();
+      });
+    }
+
     document.querySelectorAll('.level-card').forEach(c => {
       c.addEventListener('click', () => {
         document.querySelectorAll('.level-card').forEach(x => x.classList.remove('selected'));
         c.classList.add('selected');
-        this.currentLevel = parseInt(c.dataset.level);
+        this.currentLevel = parseInt(c.dataset.level, 10);
+        const nameEl = document.getElementById('selected-map-name');
+        const descEl = document.getElementById('selected-map-desc');
+        const cardTitle = c.querySelector('h4')?.innerText;
+        const cardDesc = c.querySelector('p')?.innerText?.replace(/\n/g, ' • ');
+        if (nameEl && cardTitle) nameEl.innerText = cardTitle;
+        if (descEl && cardDesc) descEl.innerText = cardDesc;
+        closeMapModal();
       });
     });
 
@@ -502,6 +535,17 @@ class GameApp {
     this.setupLevel(this.currentLevel);
 
     this.ui.hideStartMenu();
+
+    // Only show in-game controls hint on the player's very first play
+    const hintEl = document.getElementById('controls-hint-text');
+    let seen = false;
+    try { seen = localStorage.getItem('moving_chaos_2d_guide_seen_v1') === '1'; } catch { seen = true; }
+    if (hintEl) {
+      hintEl.classList.toggle('is-first-play', !seen);
+    }
+    if (!seen) {
+      try { localStorage.setItem('moving_chaos_2d_guide_seen_v1', '1'); } catch { /* ignore */ }
+    }
 
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => {

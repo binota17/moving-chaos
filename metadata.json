@@ -1,0 +1,5 @@
+{
+  "name": "Moving Chaos 3D",
+  "description": "Moving Chaos 3D & 2D — Co-op isometric physics moving game with Bobi 3D glTF characters and WebSocket multiplayer.",
+  "requestFramePermissions": []
+}

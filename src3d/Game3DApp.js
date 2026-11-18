@@ -5,9 +5,10 @@
 import * as THREE from 'three';
 import { LEVELS_3D } from './Levels3D.js';
 import { BobiModelCache } from './BobiModelLoader.js';
-import { createPropMesh3D, createTruck3D, createTrampoline3D, createGlassWall3D } from './PropFactory3D.js';
+import { createPropMesh3D, createTruck3D, createTrampoline3D, createGlassWall3D, getLawnTex, getFloorPatternTex, createDioramaWall3D } from './PropFactory3D.js';
 import { LevelMechanics, isInsideTruckBed, truckBox, inRect } from './LevelMechanics.js';
 import { buildMechanicsVisuals, addRoadMarkings } from './MechanicsVisuals3D.js';
+import { buildLevelSetDressing3D } from './DioramaDecor3D.js';
 import { t, setLang, getLevelText } from './i18n.js';
 import { loadSettings, saveSettings, evaluateBonusStatus, evaluateMatchStars, ProgressStore } from './ProgressStore.js';
 import { GamepadManager } from './GamepadManager.js';
@@ -31,6 +32,7 @@ export class Game3DApp {
     this.gameMode = 'SOLO';  // 'SOLO', 'LOCAL_2P', 'LAN_COOP'
     this.settingsModalOpen = false;
     this.controlsModalOpen = false;
+    this.mapSelectModalOpen = false;
     this.currentLevel = 1;
     this.selectedVariantP1 = 'base';
     this.selectedVariantP2 = 'builder';
@@ -42,6 +44,11 @@ export class Game3DApp {
     this.targetItemsCount = 8;
     this.landlordRage = 0;
     this.matchStats = { windowsBroken: 0, fragileBroken: 0, anyItemBroken: 0, hazardHits: 0 };
+    this.deliveryCombo = 0;
+    this.comboTimer = 0;
+    this.truckBounceOffset = 0;
+    this.truckBounceVel = 0;
+    this.deliveredSlotCount = 0;
     this.mechanics = null;
     this.mechVisuals = null;
     this.timerInterval = null;
@@ -108,6 +115,8 @@ export class Game3DApp {
     this.particles = [];
     this.trajectoryDots = [];
     this.sharedParticleGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+    this.sharedPuffGeo = new THREE.SphereGeometry(0.16, 10, 8);
+    this.puffMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.78 });
     this.particleMatCache = new Map();
 
     this.initThree();
@@ -127,19 +136,67 @@ export class Game3DApp {
     const w = container.clientWidth || 1060;
     const h = container.clientHeight || 650;
 
+    // Detect software WebGL rasterizers so shadow resolution & pixelRatio scale gracefully
+    this.isSoftwareGl = false;
+    try {
+      const probeCanvas = document.createElement('canvas');
+      const probeGl = probeCanvas.getContext('webgl2') || probeCanvas.getContext('webgl');
+      if (probeGl) {
+        const dbg = probeGl.getExtension('WEBGL_debug_renderer_info');
+        const rName = dbg ? probeGl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '';
+        if (/SwiftShader|llvmpipe|Software|Microsoft Basic/i.test(String(rName))) {
+          this.isSoftwareGl = true;
+        }
+        probeGl.getExtension('WEBGL_lose_context')?.loseContext();
+      }
+    } catch (_) {
+      this.isSoftwareGl = false;
+    }
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: this.highQuality,
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(w, h, false);
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    if ('SRGBColorSpace' in THREE) {
+      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    }
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.12;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1b263b);
-    this.scene.fog = new THREE.Fog(0x1b263b, 30, 68);
+    this.scene.background = new THREE.Color(0xa7e0fb);
+    this.scene.fog = new THREE.Fog(0xc2ebfd, 36, 82);
+
+    // Lightweight procedural PMREM sky/lawn bounce environment (no external HDR/RoomEnvironment file needed)
+    try {
+      const pmremGen = new THREE.PMREMGenerator(this.renderer);
+      const envScene = new THREE.Scene();
+      envScene.background = new THREE.Color(0xdbf2ff);
+      const envWarm = new THREE.Mesh(
+        new THREE.BoxGeometry(8, 2, 8),
+        new THREE.MeshBasicMaterial({ color: 0xfff3d1 })
+      );
+      envWarm.position.set(6, 10, 6);
+      const envLawn = new THREE.Mesh(
+        new THREE.PlaneGeometry(24, 24),
+        new THREE.MeshBasicMaterial({ color: 0x76c052 })
+      );
+      envLawn.rotation.x = -Math.PI / 2;
+      envLawn.position.y = -4;
+      envScene.add(envWarm, envLawn);
+      const envRT = pmremGen.fromScene(envScene, 0.04);
+      this.scene.environment = envRT.texture;
+      envWarm.geometry.dispose();
+      envWarm.material.dispose();
+      envLawn.geometry.dispose();
+      envLawn.material.dispose();
+      pmremGen.dispose();
+    } catch (_) {
+      // Fallback safely to direct lighting if PMREM isn't supported
+    }
 
     // Rotatable 2.5D Isometric Camera (~36 degree angle)
     this.camera = new THREE.PerspectiveCamera(35, w / h, 0.5, 110);
@@ -148,26 +205,29 @@ export class Game3DApp {
     this.camRightXZ = new THREE.Vector3();
     this.updateCameraTransform(0, 0);
 
-    // Lighting (Warm sunlit party studio)
-    const hemi = new THREE.HemisphereLight(0xfffbeb, 0x334155, 0.95);
+    // Warm toybox morning 3-point lighting with soft diffused shadows
+    const hemi = new THREE.HemisphereLight(0xfffef6, 0x62aa5e, 1.15);
     this.scene.add(hemi);
 
     const sun = new THREE.DirectionalLight(0xfff5dc, 1.9);
     sun.position.set(10, 18, 12);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    const shadowRes = this.isSoftwareGl ? 512 : 2048;
+    sun.shadow.mapSize.set(shadowRes, shadowRes);
+    sun.shadow.radius = 2.8;
     sun.shadow.camera.near = 2;
     sun.shadow.camera.far = 45;
-    sun.shadow.camera.left = -15;
-    sun.shadow.camera.right = 15;
-    sun.shadow.camera.top = 12;
-    sun.shadow.camera.bottom = -12;
-    sun.shadow.bias = -0.0008;
+    sun.shadow.camera.left = -16;
+    sun.shadow.camera.right = 16;
+    sun.shadow.camera.top = 13;
+    sun.shadow.camera.bottom = -13;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.02;
     this.sunLight = sun;
     this.scene.add(sun);
 
-    const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.45);
-    fillLight.position.set(-12, 8, -8);
+    const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.65);
+    fillLight.position.set(-12, 9, -8);
     this.scene.add(fillLight);
 
     this.scene.add(this.levelGroup);
@@ -241,12 +301,20 @@ export class Game3DApp {
       const target = m.userData.targetOpacity ?? 1.0;
       m.material.opacity += (target - m.material.opacity) * 0.22;
       m.material.depthWrite = m.material.opacity > 0.85;
+      if (Array.isArray(m.userData.linkedMeshes)) {
+        for (const lm of m.userData.linkedMeshes) {
+          if (lm.material && lm.material !== m.material) {
+            lm.material.opacity = m.material.opacity;
+            lm.material.depthWrite = m.material.depthWrite;
+          }
+        }
+      }
     }
   }
 
   applyGraphicsSettings() {
     if (this.highQuality) {
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+      this.renderer.setPixelRatio(this.isSoftwareGl ? 1.0 : Math.min(window.devicePixelRatio || 1, 1.5));
       this.renderer.shadowMap.enabled = true;
       if (this.sunLight) this.sunLight.castShadow = true;
     } else {
@@ -314,15 +382,57 @@ export class Game3DApp {
     this.scene.add(this.truckGuideArrow);
   }
 
+  getVariantPerk(variant) {
+    if (variant === 'builder') {
+      return {
+        speedMult: 1.0,
+        throwMult: 1.0,
+        grabBonus: 0,
+        heavyCarryFloor: 0.86,
+        heavyJump: 7.0,
+        stunMult: 0.5,
+        slipperyTractionMult: 1.0,
+        fragileBreakVel: -7.5
+      };
+    }
+    if (variant === 'chef') {
+      return {
+        speedMult: 1.0,
+        throwMult: 1.0,
+        grabBonus: 0,
+        heavyCarryFloor: 0.65,
+        heavyJump: 5.8,
+        stunMult: 1.0,
+        slipperyTractionMult: 2.8,
+        fragileBreakVel: -9.8
+      };
+    }
+    return {
+      speedMult: 1.12,
+      throwMult: 1.12,
+      grabBonus: 0.35,
+      heavyCarryFloor: 0.65,
+      heavyJump: 5.8,
+      stunMult: 1.0,
+      slipperyTractionMult: 1.0,
+      fragileBreakVel: -7.5
+    };
+  }
+
   findNearestGrabbable(p, maxDist = 2.0) {
     if (!p) return null;
+    const perk = this.getVariantPerk(p.variant);
     let nearest = null;
-    let minD = maxDist;
+    let bestScore = Infinity;
     this.items.forEach((it) => {
       if (!it.isHeld && !it.isDelivered && !it.isBroken) {
-        const d = Math.hypot(it.x - p.x, it.z - p.z) + Math.abs(it.y - p.y) * 0.6;
-        if (d < minD) {
-          minD = d;
+        const floorY = this.getFloorHeightAt(it.x, it.z, it.y);
+        const isAirborne = it.y > floorY + 0.24 && (Math.abs(it.vy) > 0.35 || Math.hypot(it.vx, it.vz) > 1.0);
+        const reach = maxDist + perk.grabBonus + (isAirborne ? 0.65 : 0);
+        const d = Math.hypot(it.x - p.x, it.z - p.z) + Math.abs(it.y - p.y) * 0.55;
+        const score = isAirborne ? d - 0.35 : d;
+        if (d < reach && score < bestScore) {
+          bestScore = score;
           nearest = it;
         }
       }
@@ -396,13 +506,13 @@ export class Game3DApp {
       this.levelGroup.remove(child);
       child.traverse((obj) => {
         if ((!obj.isMesh && !obj.isSprite) || obj.isSkinnedMesh) return;
-        if (obj.geometry && obj.geometry !== this.sharedParticleGeo && !obj.userData.sharedGeometry && !obj.userData.sharedAsset) {
+        if (obj.geometry && obj.geometry !== this.sharedParticleGeo && obj.geometry !== this.sharedPuffGeo && !obj.userData.sharedGeometry && !obj.userData.sharedAsset) {
           obj.geometry.dispose();
         }
         if (obj.material) {
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
           mats.forEach((m) => {
-            if (m && !sharedMats.has(m)) {
+            if (m && m !== this.puffMat && !sharedMats.has(m)) {
               if (obj.isSprite && m.map) m.map.dispose();
               m.dispose();
             }
@@ -438,25 +548,47 @@ export class Game3DApp {
       this.timeLeft = this.unlimitedTime ? -1 : def.timeLimit;
       this.landlordRage = 0;
       this.matchStats = { windowsBroken: 0, fragileBroken: 0, anyItemBroken: 0, hazardHits: 0 };
+      this.deliveryCombo = 0;
+      this.comboTimer = 0;
+      this.truckBounceOffset = 0;
+      this.truckBounceVel = 0;
+      this.deliveredSlotCount = 0;
       this.cameraShake = 0;
 
       // Clear & dispose previous level objects
       this.clearLevelObjects();
 
-    // 1. Build Lawn Ground, Multi-Roads & House Floor Zones
+    // 1. Build Dynamic Lawn Ground, Multi-Roads & Patterned House Floor Zones
+    const yardW = (def.floorSize?.w || 26) + 14;
+    const yardD = (def.floorSize?.d || 18) + 10;
+    const lawnTex = getLawnTex().clone();
+    lawnTex.wrapS = THREE.RepeatWrapping;
+    lawnTex.wrapT = THREE.RepeatWrapping;
+    lawnTex.repeat.set(Math.max(6, Math.round(yardW / 5.5)), Math.max(4, Math.round(yardD / 5.5)));
+    lawnTex.needsUpdate = true;
     const yard = new THREE.Mesh(
-      new THREE.BoxGeometry(36, 0.8, 24),
-      new THREE.MeshStandardMaterial({ color: 0x3b7a57, roughness: 0.9 })
+      new THREE.BoxGeometry(yardW, 0.8, yardD),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: lawnTex, roughness: 0.92 })
     );
     yard.position.set(0.0, -0.42, 0);
     yard.receiveShadow = true;
     this.levelGroup.add(yard);
 
+    if (this.sunLight) {
+      const halfW = Math.max(16, (def.floorSize?.w || 26) * 0.62);
+      const halfD = Math.max(13, (def.floorSize?.d || 18) * 0.68);
+      this.sunLight.shadow.camera.left = -halfW;
+      this.sunLight.shadow.camera.right = halfW;
+      this.sunLight.shadow.camera.top = halfD;
+      this.sunLight.shadow.camera.bottom = -halfD;
+      this.sunLight.shadow.camera.updateProjectionMatrix();
+    }
+
     const roadList = def.roads || [{ x: 8.2, z: 0, w: 7.6, d: 17.0 }];
     roadList.forEach((rd) => {
       const road = new THREE.Mesh(
         new THREE.BoxGeometry(rd.w, 0.06, rd.d),
-        new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 })
+        new THREE.MeshStandardMaterial({ color: 0x576574, roughness: 0.86 })
       );
       road.position.set(rd.x, 0.01, rd.z);
       road.receiveShadow = true;
@@ -465,18 +597,64 @@ export class Game3DApp {
     });
 
     const floorZones = def.houseZones || (def.houseBounds ? [def.houseBounds] : []);
-    floorZones.forEach((hb) => {
+    floorZones.forEach((hb, zIdx) => {
       const hw = hb.maxX - hb.minX;
       const hd = hb.maxZ - hb.minZ;
-      const houseFloorColor = hb.color || def.floorColor || (lvlId === 3 ? 0xf1f5f9 : 0xe2b887);
+      let styleKey = 'polka_pink';
+      let baseHex = '#f47b8c';
+      if (lvlId === 2) {
+        styleKey = 'parquet_lavender';
+        baseHex = '#c4b5fd';
+      } else if (lvlId === 3) {
+        styleKey = zIdx === 0 ? 'bistro_tile' : 'polka_blue';
+        baseHex = zIdx === 0 ? '#fef3c7' : '#bfdbfe';
+      } else if (lvlId === 4) {
+        styleKey = 'bistro_tile';
+        baseHex = '#fde68a';
+      } else if (lvlId === 5) {
+        styleKey = 'concrete_site';
+        baseHex = '#cbd5e1';
+      } else if (lvlId === 6) {
+        styleKey = 'warehouse_grid';
+        baseHex = '#cbd5e1';
+      }
+      const patTex = getFloorPatternTex(styleKey, baseHex).clone();
+      patTex.wrapS = THREE.RepeatWrapping;
+      patTex.wrapT = THREE.RepeatWrapping;
+      patTex.repeat.set(Math.max(1, hw / 3.2), Math.max(1, hd / 3.2));
+      patTex.needsUpdate = true;
       const houseFloor = new THREE.Mesh(
         new THREE.BoxGeometry(hw, 0.14, hd),
-        new THREE.MeshStandardMaterial({ color: houseFloorColor, roughness: 0.65 })
+        new THREE.MeshStandardMaterial({ color: 0xffffff, map: patTex, roughness: 0.62 })
       );
       houseFloor.position.set((hb.minX + hb.maxX) / 2, 0.04, (hb.minZ + hb.maxZ) / 2);
       houseFloor.receiveShadow = true;
       this.levelGroup.add(houseFloor);
     });
+
+    // Level 1 kitchen tiled nook (classic white checkerboard contrasting the coral polka living room)
+    if (lvlId === 1) {
+      const kitchenTileTex = getFloorPatternTex('bistro_tile', '#f8fafc').clone();
+      kitchenTileTex.wrapS = THREE.RepeatWrapping;
+      kitchenTileTex.wrapT = THREE.RepeatWrapping;
+      kitchenTileTex.repeat.set(1.5, 1.5);
+      kitchenTileTex.needsUpdate = true;
+      const kitchenPad = new THREE.Mesh(
+        new THREE.PlaneGeometry(3.8, 3.8),
+        new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          map: kitchenTileTex,
+          roughness: 0.45,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1
+        })
+      );
+      kitchenPad.rotation.x = -Math.PI / 2;
+      kitchenPad.position.set(-7.6, 0.114, 3.8);
+      kitchenPad.receiveShadow = true;
+      this.levelGroup.add(kitchenPad);
+    }
 
     // Platforms (Upper Tiers) - fadeable if occluding player below
     def.platforms.forEach((p) => {
@@ -522,16 +700,19 @@ export class Game3DApp {
       this.levelGroup.add(rampMesh);
     });
 
-    // Walls (each wall gets an occluder transparent-ready material)
-    const wallColor = def.wallColor || (lvlId === 3 ? 0xfef3c7 : (lvlId === 5 ? 0xf59e0b : 0xe2e8f0));
+    // Walls (cutaway brick walls with cream top caps + wooden garden fences)
+    const wallPalette = {
+      1: '#e59467',
+      2: '#d98b72',
+      3: '#e8b06b',
+      4: '#d98a5f',
+      5: '#d99043',
+      6: '#94a3b8'
+    };
+    const wallHex = wallPalette[lvlId] || '#e59467';
     def.walls.forEach((w) => {
-      const wallMat = new THREE.MeshStandardMaterial({
-        color: wallColor, roughness: 0.85, transparent: true, opacity: 1.0
-      });
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w.w, w.h, w.d), wallMat);
-      m.position.set(w.x, w.y, w.z);
-      m.castShadow = true;
-      m.receiveShadow = true;
+      const m = createDioramaWall3D(w.w, w.h, w.d, { wallHex, capHex: 0xfef7e6 });
+      m.position.set(w.x, m.userData.overrideY ?? w.y, w.z);
       this.levelGroup.add(m);
       this.occluderMeshes.push(m);
     });
@@ -559,6 +740,9 @@ export class Game3DApp {
     this.truck.mesh.rotation.y = def.truck.rotY || 0;
     this.levelGroup.add(this.truck.mesh);
 
+    // Cozy diorama set dressing (sidewalk curbs, grass tufts, perimeter fence, trees, flamingos, rug, clock)
+    buildLevelSetDressing3D(def, this.levelGroup, { lvlId });
+
     // Interactive Level Mechanics (switches, gates, pits, zones, elevators, hazards)
     this.mechanics = new LevelMechanics(def);
     this.mechVisuals = buildMechanicsVisuals(this.mechanics, this.levelGroup);
@@ -578,7 +762,9 @@ export class Game3DApp {
         vx: 0, vy: 0, vz: 0,
         vrot: 0,
         hazardCooldown: 0,
-        radius: (iDef.isSuperHeavy || iDef.type === 'sofa') ? 0.65 : 0.42,
+        hopTimer: 0.9 + Math.random() * 1.4,
+        lastOwnerVariant: null,
+        radius: (iDef.isSuperHeavy || iDef.type === 'sofa' || iDef.type === 'bed' || iDef.type === 'dining_table' || iDef.type === 'bookshelf') ? 0.64 : 0.42,
         isHeld: false,
         heldBy: null,
         isDelivered: false,
@@ -637,6 +823,11 @@ export class Game3DApp {
       throwPower: 0,
       throwCooldown: 0,
       stunTimer: 0,
+      dashTimer: 0,
+      dashCooldown: 0,
+      dashHitCooldown: 0,
+      catchBoostTimer: 0,
+      puffTimer: 0,
       squashX: 1.0,
       squashY: 1.0
     };
@@ -669,7 +860,9 @@ export class Game3DApp {
       const wasDown = this.keys[code];
 
       if (code === 'Escape') {
-        if (this.controlsModalOpen) {
+        if (this.mapSelectModalOpen) {
+          this.closeMapSelectModal();
+        } else if (this.controlsModalOpen) {
           this.closeControlsModal();
         } else if (this.settingsModalOpen) {
           this.closePauseOrSettings();
@@ -707,19 +900,23 @@ export class Game3DApp {
       //   P2 Right (Arrows + Enter/Num0/ShiftRight + K/Num1 Grab + L/Num2 Throw).
       const isP1GrabKey = isSinglePersonScreen ? code === 'KeyJ' : code === 'KeyC';
       const isP1ThrowKey = isSinglePersonScreen ? code === 'KeyK' : code === 'KeyV';
+      const isP1DashKey = code === 'KeyF';
 
       if (!wasDown && isLanClient && p2) {
         if (code === 'Space') this.playerJump(p2);
         if (isP1GrabKey) this.sendClientActionSafe('grab', p2);
+        if (isP1DashKey && this.triggerDash(p2)) this.sendClientActionSafe('dash', p2);
         if (isP1ThrowKey && p2.holdingItem) p2.chargingThrow = true;
       } else if (!wasDown && !isLanClient && p1) {
         if (code === 'Space') this.playerJump(p1);
         if (isP1GrabKey) this.toggleGrab(p1);
+        if (isP1DashKey) this.triggerDash(p1);
         if (isP1ThrowKey && p1.holdingItem) p1.chargingThrow = true;
       }
 
       if (!wasDown && p2 && this.gameMode === 'LOCAL_2P') {
         if (code === 'ShiftRight' || code === 'Enter' || code === 'Numpad0') this.playerJump(p2);
+        if (code === 'Slash' || code === 'Numpad3') this.triggerDash(p2);
         if (code === 'KeyK' || code === 'Numpad1') this.toggleGrab(p2);
         if ((code === 'KeyL' || code === 'Numpad2') && p2.holdingItem) {
           p2.chargingThrow = true;
@@ -830,15 +1027,11 @@ export class Game3DApp {
     const lanPanel = document.getElementById('lan-panel');
     const p1Label = document.getElementById('p1-controls-label');
     const p2Label = document.getElementById('p2-controls-label');
-    const instruction = document.getElementById('mode-instruction');
-    const quickStrip = document.getElementById('quick-keys-strip');
 
     if (this.gameMode === 'SOLO') {
       if (lanPanel) lanPanel.style.display = 'none';
       if (p1Label) p1Label.innerHTML = t('ctrl_single_hud');
       if (p2Label) p2Label.style.display = 'none';
-      if (instruction) instruction.innerHTML = t('inst_solo');
-      if (quickStrip) quickStrip.innerHTML = t('controls_quick_hint');
     } else if (this.gameMode === 'LOCAL_2P') {
       if (lanPanel) lanPanel.style.display = 'none';
       if (p1Label) p1Label.innerHTML = t('ctrl_p1_hud');
@@ -846,14 +1039,10 @@ export class Game3DApp {
         p2Label.style.display = 'inline';
         p2Label.innerHTML = t('ctrl_p2_hud');
       }
-      if (instruction) instruction.innerHTML = t('inst_local2p');
-      if (quickStrip) quickStrip.innerHTML = `${t('ctrl_p1_hud')} ${t('ctrl_p2_hud')}`;
     } else if (this.gameMode === 'LAN_COOP') {
       if (lanPanel) lanPanel.style.display = 'block';
       if (p1Label) p1Label.innerHTML = t('ctrl_single_hud');
       if (p2Label) p2Label.style.display = 'none';
-      if (instruction) instruction.innerHTML = t('inst_lan');
-      if (quickStrip) quickStrip.innerHTML = t('controls_quick_hint');
     }
   }
 
@@ -868,15 +1057,24 @@ export class Game3DApp {
       });
     });
 
-    // Level Selector Cards
+    // Level Selector Cards (inside Map Select Modal)
     document.querySelectorAll('.level-card').forEach((c) => {
       c.addEventListener('click', () => {
         document.querySelectorAll('.level-card').forEach(x => x.classList.remove('selected'));
         c.classList.add('selected');
-        this.currentLevel = parseInt(c.dataset.level);
+        this.currentLevel = parseInt(c.dataset.level, 10);
         this.updateStageSpotlight();
+        this.renderSelectedMapSummary();
+        this.closeMapSelectModal();
         this.setupLevel(this.currentLevel);
       });
+    });
+
+    // Map Select Modal toggle
+    document.getElementById('open-map-select-btn')?.addEventListener('click', () => this.openMapSelectModal());
+    document.getElementById('map-select-close-btn')?.addEventListener('click', () => this.closeMapSelectModal());
+    document.getElementById('map-select-modal')?.addEventListener('click', (e) => {
+      if (e.target?.id === 'map-select-modal') this.closeMapSelectModal();
     });
 
     // Game Mode Tabs
@@ -912,12 +1110,17 @@ export class Game3DApp {
     document.getElementById('menu-cam-left')?.addEventListener('click', () => { this.menuOrbitBias -= Math.PI / 4; });
     document.getElementById('menu-cam-right')?.addEventListener('click', () => { this.menuOrbitBias += Math.PI / 4; });
 
-    // Controls Guide Modal
+    // Unified Guide Modal (menu + in-game HUD button + first-play hint close)
     document.getElementById('controls-toggle-btn')?.addEventListener('click', () => this.openControlsModal());
-    document.getElementById('controls-quick-more-btn')?.addEventListener('click', () => this.openControlsModal());
+    document.getElementById('hud-guide-btn')?.addEventListener('click', () => this.openControlsModal());
     document.getElementById('controls-close-btn')?.addEventListener('click', () => this.closeControlsModal());
     document.getElementById('controls-modal')?.addEventListener('click', (e) => {
       if (e.target?.id === 'controls-modal') this.closeControlsModal();
+    });
+    document.getElementById('hud-hint-close-btn')?.addEventListener('click', () => {
+      document.getElementById('controls-hint-text')?.classList.remove('is-first-play');
+      this.settings.guideSeen = true;
+      saveSettings(this.settings);
     });
 
     // Start, Replay, Pause & Menu buttons
@@ -1040,6 +1243,8 @@ export class Game3DApp {
 
       if (act.type === 'grab') {
         this.toggleGrab(p2);
+      } else if (act.type === 'dash') {
+        this.triggerDash(p2, { isRemote: true });
       } else if (act.type === 'throw' && p2.holdingItem) {
         p2.throwPower = act.power ?? 0.6;
         if (act.useAim) {
@@ -1065,7 +1270,7 @@ export class Game3DApp {
 
     eventBus.on('peerConnected', (info = {}) => {
       if (info.p2Variant) this.selectedVariantP2 = info.p2Variant;
-      this.ui.addFeedPill('<span>Bobi P2 đã vào phòng LAN!</span><b style="color:#00cec9;">Sẵn sàng!</b>');
+      this.ui.addFeedPill('<span>P2 đã vào!</span><b style="color:#0284c7;">Sẵn sàng</b>');
       this.startOrRestartMatch();
     });
     eventBus.on('roomJoined', (info = {}) => {
@@ -1074,7 +1279,7 @@ export class Game3DApp {
       if (info.p2Variant) this.selectedVariantP2 = info.p2Variant;
       this.unlimitedTime = !!info.unlimitedTime;
       this.syncMenuSelectionsUI();
-      this.ui.addFeedPill('<span>Đã kết nối Host LAN!</span><b style="color:#2ecc71;">Chiến thôi!</b>');
+      this.ui.addFeedPill('<span>Đã vào phòng!</span><b style="color:#15803d;">Bắt đầu</b>');
       this.startGame();
     });
     eventBus.on('restartGame', (info = {}) => {
@@ -1111,6 +1316,7 @@ export class Game3DApp {
       pill.classList.toggle('active', (pill.dataset.unlimited === 'true') === !!this.unlimitedTime);
     });
     this.updateStageSpotlight();
+    this.renderSelectedMapSummary();
   }
 
   setLanguage(lang) {
@@ -1132,12 +1338,18 @@ export class Game3DApp {
     setText('logo-sub', t('logo_sub'));
     setText('sec-char-mode-label', t('sec_character_mode'));
     setText('sec-levels-label', t('sec_levels'));
+    setText('open-map-select-btn', t('open_map_select_btn'));
+    setText('map-select-modal-title', t('map_select_modal_title'));
+    setText('map-select-close-btn', t('btn_close'));
     setText('var-base-title', t('variant_base_title'));
     setText('var-base-desc', t('variant_base_desc'));
+    setText('var-base-perk', t('variant_base_perk'));
     setText('var-builder-title', t('variant_builder_title'));
     setText('var-builder-desc', t('variant_builder_desc'));
+    setText('var-builder-perk', t('variant_builder_perk'));
     setText('var-chef-title', t('variant_chef_title'));
     setText('var-chef-desc', t('variant_chef_desc'));
+    setText('var-chef-perk', t('variant_chef_perk'));
     setText('mode-tab-solo', t('mode_solo'));
     setText('mode-tab-local2p', t('mode_local2p'));
     setText('mode-tab-lan', t('mode_lan'));
@@ -1153,13 +1365,16 @@ export class Game3DApp {
     setText('menu-settings-btn', t('menu_settings_btn'));
     setText('controls-toggle-btn', t('controls_btn'));
     setText('controls-modal-title', t('controls_modal_title'));
+    const guideBody = document.getElementById('guide-modal-body');
+    if (guideBody) guideBody.innerHTML = t('guide_full_html');
     setText('controls-close-btn', t('btn_close'));
     setText('stage-cam-hint', t('stage_cam_hint'));
-    setText('lang-toggle-btn', this.settings.lang === 'en' ? '🇺🇸 English' : '🇻🇳 Tiếng Việt');
+    setText('lang-toggle-btn', this.settings.lang === 'en' ? '🇺🇸 EN' : '🇻🇳 VI');
 
     setText('hud-truck-label', t('hud_truck'));
     setText('hud-cash-label', t('hud_cash'));
     setText('hud-rage-label', t('hud_rage'));
+    setText('touch-dash-btn', t('touch_dash'));
     setText('touch-jump-btn', t('touch_jump'));
     setText('touch-grab-btn', t('touch_grab'));
     setText('touch-throw-btn', t('touch_throw'));
@@ -1214,7 +1429,34 @@ export class Game3DApp {
         <div class="level-card-meta"><span>${t('par_label', { sec: def.parTime || def.timeLimit })}</span><span>${recordText}</span></div>
       `;
     });
+    this.renderSelectedMapSummary();
     this.updateStageSpotlight();
+  }
+
+  renderSelectedMapSummary() {
+    const id = this.currentLevel || 1;
+    const def = LEVELS_3D[id] || LEVELS_3D[1];
+    const txt = getLevelText(id);
+    const rec = this.progressStore.getLevelRecord(id);
+
+    let starsHtml = '';
+    for (let s = 1; s <= 3; s++) {
+      starsHtml += `<span class="${s <= rec.bestStars ? 'star-lit' : 'star-dim'}">★</span>`;
+    }
+    const recordText = rec.bestTime !== null
+      ? t('best_record_fmt', { score: rec.bestScore.toLocaleString('vi-VN'), time: rec.bestTime })
+      : t('no_record');
+
+    const nameEl = document.getElementById('selected-map-name');
+    const starsEl = document.getElementById('selected-map-stars');
+    const descEl = document.getElementById('selected-map-desc');
+    const parEl = document.getElementById('selected-map-par');
+    const recEl = document.getElementById('selected-map-record');
+    if (nameEl) nameEl.innerText = txt.name;
+    if (starsEl) starsEl.innerHTML = starsHtml;
+    if (descEl) descEl.innerText = txt.shortDesc;
+    if (parEl) parEl.innerText = t('par_label', { sec: def.parTime || def.timeLimit });
+    if (recEl) recEl.innerText = recordText;
   }
 
   updateStageSpotlight() {
@@ -1247,6 +1489,18 @@ export class Game3DApp {
     }
   }
 
+  openMapSelectModal() {
+    this.mapSelectModalOpen = true;
+    const modal = document.getElementById('map-select-modal');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  closeMapSelectModal() {
+    this.mapSelectModalOpen = false;
+    const modal = document.getElementById('map-select-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
   openControlsModal() {
     this.controlsModalOpen = true;
     const modal = document.getElementById('controls-modal');
@@ -1263,11 +1517,12 @@ export class Game3DApp {
     const pill = document.getElementById('gamepad-status-pill');
     if (!pill) return;
     if (count > 0) {
+      pill.style.display = 'inline-flex';
       pill.classList.add('pad-on');
       pill.innerText = t('gamepad_ready', { count });
     } else {
+      pill.style.display = 'none';
       pill.classList.remove('pad-on');
-      pill.innerText = t('gamepad_none');
     }
   }
 
@@ -1418,6 +1673,11 @@ export class Game3DApp {
       zone.addEventListener('pointercancel', resetStick);
     }
 
+    document.getElementById('touch-dash-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      soundManager.init();
+      this.triggerActionDash();
+    });
     document.getElementById('touch-jump-btn')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       soundManager.init();
@@ -1498,6 +1758,15 @@ export class Game3DApp {
       aimX: r2(this.aimWorldPoint.x),
       aimZ: r2(this.aimWorldPoint.z)
     });
+  }
+
+  triggerActionDash() {
+    if (this.gameState !== 'PLAYING') return;
+    const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
+    const activeP = isLanClient ? this.players[1] : this.players[0];
+    if (activeP && this.triggerDash(activeP) && isLanClient) {
+      this.sendClientActionSafe('dash', activeP);
+    }
   }
 
   triggerActionJump() {
@@ -1610,12 +1879,25 @@ export class Game3DApp {
     this.pendingNetEvents = [];
     this.settingsModalOpen = false;
     this.closeControlsModal();
+    this.closeMapSelectModal();
     this.targetCamAngle = 0.22;
     this.camAngle = 0.22;
     this.ui.hideStartMenu();
 
     await this.setupLevel(this.currentLevel);
     this.syncControlHints();
+
+    // Show bottom controls hint ONLY on the player's very first match
+    const hintEl = document.getElementById('controls-hint-text');
+    if (hintEl) {
+      const showFirstPlayHint = !this.settings.guideSeen;
+      hintEl.classList.toggle('is-first-play', showFirstPlayHint);
+      if (showFirstPlayHint) {
+        this.settings.guideSeen = true;
+        saveSettings(this.settings);
+      }
+    }
+
     this.gameState = 'PLAYING';
     this.syncHUD();
 
@@ -1692,7 +1974,8 @@ export class Game3DApp {
     if (p.stunTimer > 0) return;
     if (p.isGrounded) {
       const heavy = p.holdingItem && p.holdingItem.isSuperHeavy;
-      p.vy = heavy ? 5.8 : 7.6;
+      const perk = this.getVariantPerk(p.variant);
+      p.vy = heavy ? perk.heavyJump : 7.6;
       p.isGrounded = false;
       p.squashX = 0.82;
       p.squashY = 1.24;
@@ -1750,6 +2033,54 @@ export class Game3DApp {
     return true;
   }
 
+  triggerDash(p, { isRemote = false } = {}) {
+    if (!p || p.stunTimer > 0 || this.gameState !== 'PLAYING') return false;
+    if (!isRemote && p.dashCooldown > 0) return false;
+    p.dashTimer = 0.22;
+    p.dashCooldown = 1.35;
+    p.dashHitCooldown = 0;
+
+    if (!isRemote) {
+      const burst = p.holdingItem?.isSuperHeavy ? 10.5 : 13.5;
+      p.vx = Math.sin(p.rotY) * burst;
+      p.vz = Math.cos(p.rotY) * burst;
+      if (p.isGrounded) p.vy = Math.max(p.vy, 2.2);
+      p.squashX = 1.32;
+      p.squashY = 0.76;
+      soundManager.dash();
+      this.rumblePlayer(p, 0.3, 65);
+      this.emitBurst(p.x, p.y + 0.35, p.z, 0xe2e8f0, 10);
+      this.spawnPuffSmoke(p.x, p.y + 0.25, p.z, 5, 1.15);
+      this.spawnFloatingText('💨 VỤT!', p.x, p.y + 1.5, p.z, '#c084fc');
+    } else {
+      soundManager.dash();
+      this.emitBurst(p.x, p.y + 0.35, p.z, 0xe2e8f0, 10);
+      this.spawnPuffSmoke(p.x, p.y + 0.25, p.z, 5, 1.15);
+      this.spawnFloatingText('💨 VỤT!', p.x, p.y + 1.5, p.z, '#c084fc');
+    }
+    return true;
+  }
+
+  mountDeliveredItemInTruck(it) {
+    const cargoMount = this.truck?.mesh?.userData?.cargoMount;
+    if (!cargoMount || !it?.mesh) return;
+    if (it.mesh.parent === cargoMount) return;
+
+    const slot = this.deliveredSlotCount++;
+    const col = slot % 3;
+    const row = Math.floor(slot / 3) % 3;
+    const tier = Math.floor(slot / 9);
+    const lx = -1.15 + col * 1.15 + ((tier % 2) * 0.14);
+    const lz = -1.35 + row * 1.35;
+    const ly = 0.66 + tier * 0.92;
+
+    cargoMount.add(it.mesh);
+    const isOversized = it.type === 'bed' || it.type === 'dining_table' || it.type === 'bookshelf' || it.type === 'piano';
+    it.mesh.scale.setScalar(isOversized ? 0.54 : 0.68);
+    it.mesh.position.set(lx, ly, lz);
+    it.mesh.rotation.set(0, ((slot * 0.65) % (Math.PI * 2)) - Math.PI, 0);
+  }
+
   toggleGrab(p) {
     if (p.stunTimer > 0) return;
 
@@ -1759,6 +2090,7 @@ export class Game3DApp {
       it.isHeld = false;
       it.heldBy = null;
       it.thrownBy = p;
+      it.lastOwnerVariant = p.variant;
       it.throwProtectTimer = 0.25;
       this.levelGroup.add(it.mesh);
       it.x = p.x + Math.sin(p.rotY) * 0.85;
@@ -1783,9 +2115,12 @@ export class Game3DApp {
     }
 
     if (nearest) {
+      const floorY = this.getFloorHeightAt(nearest.x, nearest.z, nearest.y);
+      const isAirborne = nearest.y > floorY + 0.24 && (Math.abs(nearest.vy) > 0.35 || Math.hypot(nearest.vx, nearest.vz) > 1.0);
       p.holdingItem = nearest;
       nearest.isHeld = true;
       nearest.heldBy = p;
+      nearest.lastOwnerVariant = p.variant;
       nearest.vx = nearest.vy = nearest.vz = 0;
 
       // Mount directly to Bobi's Overhead Carry Socket!
@@ -1794,9 +2129,34 @@ export class Game3DApp {
       nearest.mesh.rotation.set(0, 0, 0);
 
       p.bobi.playAnimation('CHR_Base_PickUp', 0.08);
-      soundManager.grab();
       this.rumblePlayer(p, 0.25, 60);
-      this.spawnFloatingText(`${p.name}: BÊ ĐỒ! 📦`, p.x, p.y + 1.8, p.z, '#fef08a');
+
+      if (isAirborne) {
+        p.catchBoostTimer = 2.5;
+        soundManager.catchAir();
+        this.emitBurst(nearest.x, nearest.y + 0.3, nearest.z, 0x38bdf8, 16);
+        if (nearest.thrownBy && nearest.thrownBy !== p && nearest.coopPassEligible) {
+          nearest.coopPassEligible = false;
+          const passBonus = 250000;
+          this.score += passBonus;
+          const text = `⚡ BẮT TRÊN KHÔNG! +${passBonus.toLocaleString()}đ`;
+          this.spawnFloatingText(text, p.x, p.y + 2.0, p.z, '#38bdf8');
+          this.ui.addFeedPill(`<span>⚡ Bắt trên không: ${nearest.name}</span><b style="color:#0284c7;">+${passBonus.toLocaleString()}đ</b>`, 'glass');
+          this.pushNetEvent('coop_pass', { x: p.x, y: p.y + 2.0, z: p.z, text, air: true });
+        } else {
+          const text = '⚡ BẮT ĐỈNH! +LỰC NÉM!';
+          this.spawnFloatingText(text, p.x, p.y + 2.0, p.z, '#38bdf8');
+          this.pushNetEvent('coop_pass', { x: p.x, y: p.y + 2.0, z: p.z, text, air: true });
+        }
+      } else {
+        soundManager.grab();
+        if (nearest.isLiving) {
+          soundManager.petSound();
+          this.spawnFloatingText('🐾 ÔM ĐƯỢC RỒI!', p.x, p.y + 1.8, p.z, '#fde68a');
+        } else {
+          this.spawnFloatingText(`${p.name}: BÊ ĐỒ! 📦`, p.x, p.y + 1.8, p.z, '#fef08a');
+        }
+      }
     }
   }
 
@@ -1812,6 +2172,7 @@ export class Game3DApp {
     it.isHeld = false;
     it.heldBy = null;
     it.thrownBy = p;
+    it.lastOwnerVariant = p.variant;
     it.throwProtectTimer = 0.35;
     it.coopPassEligible = true;
 
@@ -1838,9 +2199,14 @@ export class Game3DApp {
       }
     }
 
+    const perk = this.getVariantPerk(p.variant);
+    const hasCatchBoost = (p.catchBoostTimer || 0) > 0;
+    const catchBoost = hasCatchBoost ? 1.18 : 1.0;
+    p.catchBoostTimer = 0;
+
     const weightMult = it.isSuperHeavy ? 0.68 : (it.isHeavy ? 0.84 : 1.0);
-    const speedXZ = 11.5 * power * weightMult;
-    const speedY = 6.2 * power * weightMult;
+    const speedXZ = 11.5 * power * weightMult * perk.throwMult * catchBoost;
+    const speedY = 6.2 * power * weightMult * perk.throwMult * catchBoost;
 
     it.vx = dirX * speedXZ;
     it.vz = dirZ * speedXZ;
@@ -1854,8 +2220,8 @@ export class Game3DApp {
     soundManager.throwItem();
     this.rumblePlayer(p, 0.45, 95);
 
-    this.spawnFloatingText('YEET!! 🚀', p.x, p.y + 1.9, p.z, '#ff7675');
-    this.emitBurst(it.x, it.y, it.z, 0xfde047, 10);
+    this.spawnFloatingText(hasCatchBoost ? '⚡ SIÊU NÉM!! 🚀' : 'YEET!! 🚀', p.x, p.y + 1.9, p.z, hasCatchBoost ? '#38bdf8' : '#ff7675');
+    this.emitBurst(it.x, it.y, it.z, hasCatchBoost ? 0x38bdf8 : 0xfde047, hasCatchBoost ? 16 : 10);
   }
 
   getFloorHeightAt(x, z, curY) {
@@ -1992,7 +2358,7 @@ export class Game3DApp {
     const suffix = penalty > 0 ? ` -${penalty.toLocaleString()}đ` : '';
     this.spawnFloatingText(`${toastText}${suffix}`, it.x, it.y + 1.5, it.z, '#fb923c');
     if (feedLabel) {
-      this.ui.addFeedPill(`<span>${feedLabel}: ${it.name}</span><b style="color:#fb923c;">-${penalty.toLocaleString()}đ</b>`, 'broke');
+      this.ui.addFeedPill(`<span>${feedLabel}: ${it.name}</span><b style="color:#c2410c;">-${penalty.toLocaleString()}đ</b>`, 'broke');
     }
     this.pushNetEvent('item_respawn', {
       bx, by, bz,
@@ -2020,7 +2386,8 @@ export class Game3DApp {
       });
     }
 
-    p.stunTimer = isPit ? 1.15 : 1.5;
+    const stunMult = this.getVariantPerk(p.variant).stunMult;
+    p.stunTimer = (isPit ? 1.15 : 1.5) * stunMult;
     p.squashY = 0.38;
     p.squashX = 1.52;
     p.vy = 0;
@@ -2075,6 +2442,11 @@ export class Game3DApp {
       if (pad.justGrab) {
         if (asLanClient) this.sendClientActionSafe('grab', player);
         else this.toggleGrab(player);
+      }
+      if (pad.justDash || (pad.justThrowStart && !player.holdingItem)) {
+        if (this.triggerDash(player) && asLanClient) {
+          this.sendClientActionSafe('dash', player);
+        }
       }
       if (pad.justThrowStart && player.holdingItem) {
         player.chargingThrow = true;
@@ -2142,7 +2514,14 @@ export class Game3DApp {
     p.squashY += (1.0 - p.squashY) * Math.min(1, dt * 10);
     p.bobi.root.scale.set(p.squashX, p.squashY, p.squashX);
 
+    const perk = this.getVariantPerk(p.variant);
+
     if (p.throwCooldown > 0) p.throwCooldown -= dt;
+    if (p.dashCooldown > 0) p.dashCooldown = Math.max(0, p.dashCooldown - dt);
+    if (p.dashHitCooldown > 0) p.dashHitCooldown = Math.max(0, p.dashHitCooldown - dt);
+    if (p.catchBoostTimer > 0) p.catchBoostTimer = Math.max(0, p.catchBoostTimer - dt);
+    const isDashing = p.dashTimer > 0;
+    if (p.dashTimer > 0) p.dashTimer = Math.max(0, p.dashTimer - dt);
 
     if (p.stunTimer > 0) {
       p.stunTimer -= dt;
@@ -2175,7 +2554,9 @@ export class Game3DApp {
     moveVec.addScaledVector(this.camFwdXZ, inY);
     moveVec.addScaledVector(this.camRightXZ, inX);
 
-    let carryMult = p.holdingItem ? (p.holdingItem.isSuperHeavy ? 0.65 : 0.85) : 1.0;
+    let carryMult = p.holdingItem
+      ? (p.holdingItem.isSuperHeavy ? perk.heavyCarryFloor : Math.max(0.85, perk.heavyCarryFloor))
+      : 1.0;
     if (p.holdingItem && (p.holdingItem.isHeavy || p.holdingItem.isSuperHeavy) && this.players.length > 1) {
       const mate = this.players.find(other => other !== p && other.stunTimer <= 0);
       if (mate && Math.hypot(mate.x - p.x, mate.z - p.z) <= 2.5) {
@@ -2187,7 +2568,7 @@ export class Game3DApp {
         }
       }
     }
-    const maxSpeed = (sprinting ? 7.2 : 4.8) * carryMult;
+    const maxSpeed = (sprinting ? 7.2 : 4.8) * carryMult * perk.speedMult;
     const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
     const surface = (p.isGrounded && this.mechanics)
       ? this.mechanics.surfaceAt(p.x, p.z, p.y)
@@ -2196,6 +2577,11 @@ export class Game3DApp {
     const hasInput = moveVec.lengthSq() > 0.01;
     let targetVx = surface.convX;
     let targetVz = surface.convZ;
+    if (p.holdingItem?.isVibrating && p.isGrounded) {
+      const vibT = performance.now() * 0.026 + p.id * 2.1;
+      targetVx += Math.sin(vibT) * 0.85;
+      targetVz += Math.cos(vibT * 1.3) * 0.85;
+    }
     if (hasInput) {
       moveVec.normalize();
       targetVx += moveVec.x * maxSpeed;
@@ -2207,9 +2593,44 @@ export class Game3DApp {
       p.rotY += diff * Math.min(1, dt * 14);
     }
 
-    const traction = surface.slippery ? (hasInput ? 2.8 : 1.7) : 14.0;
+    const baseTraction = surface.slippery ? (hasInput ? 2.8 : 1.7) * perk.slipperyTractionMult : 14.0;
+    const traction = isDashing ? 2.2 : baseTraction;
     p.vx = THREE.MathUtils.lerp(p.vx, targetVx, Math.min(1, dt * traction));
     p.vz = THREE.MathUtils.lerp(p.vz, targetVz, Math.min(1, dt * traction));
+
+    if (isDashing && !isLanClient) {
+      if (this.mechanics) {
+        const stunnedHz = this.mechanics.stunPatrolNear(p.x, p.y, p.z, 1.45, 2.2);
+        if (stunnedHz) {
+          soundManager.bonk();
+          this.rumblePlayer(p, 0.55, 110);
+          this.emitBurst(stunnedHz.x, 1.0, stunnedHz.z, 0xfacc15, 16);
+          this.spawnFloatingText('💫 CHOÁNG LUÔN!', stunnedHz.x, 2.0, stunnedHz.z, '#fde047');
+          this.pushNetEvent('patrol_stun', { x: stunnedHz.x, y: 1.0, z: stunnedHz.z });
+        }
+      }
+      if (this.players.length > 1 && p.dashHitCooldown <= 0) {
+        const mate = this.players.find(other => other !== p && other.stunTimer <= 0 && Math.hypot(other.x - p.x, other.z - p.z) < 1.05 && Math.abs(other.y - p.y) < 1.1);
+        if (mate) {
+          p.dashHitCooldown = 0.6;
+          const dx = mate.x - p.x;
+          const dz = mate.z - p.z;
+          const d = Math.hypot(dx, dz) || 1;
+          const matePerk = this.getVariantPerk(mate.variant);
+          mate.vx = (dx / d) * 7.2;
+          mate.vz = (dz / d) * 7.2;
+          mate.vy = 3.5;
+          mate.stunTimer = 0.55 * matePerk.stunMult;
+          mate.squashX = 1.38;
+          mate.squashY = 0.68;
+          soundManager.bonk();
+          this.rumbleAllActive(0.45, 95);
+          this.emitBurst(mate.x, mate.y + 0.8, mate.z, 0xf472b6, 12);
+          this.spawnFloatingText('👋 BẠP! TRÊU TÍ!', mate.x, mate.y + 1.9, mate.z, '#f472b6');
+          this.pushNetEvent('dash_slap', { x: mate.x, y: mate.y + 1.4, z: mate.z });
+        }
+      }
+    }
 
     if (!p.isGrounded && this.mechanics) {
       const wind = this.mechanics.windAt(p.x, p.z, p.y);
@@ -2240,6 +2661,7 @@ export class Game3DApp {
       if (!p.isGrounded && p.vy < -5.5) {
         p.squashX = 1.24;
         p.squashY = 0.78;
+        this.spawnPuffSmoke(p.x, floorY + 0.18, p.z, 3, 0.95);
       }
       p.y = floorY;
       p.vy = 0;
@@ -2284,8 +2706,23 @@ export class Game3DApp {
     p.bobi.root.position.set(p.x, p.y, p.z);
     p.bobi.root.rotation.y = p.rotY;
 
-    // Drive 3D Animation Clips
+    // Drive 3D Animation Clips & cartoon puff smoke footsteps
     const speedH = Math.hypot(p.vx, p.vz);
+    if (p.isGrounded && speedH > 4.4) {
+      p.puffTimer = (p.puffTimer || 0) - dt;
+      if (p.puffTimer <= 0) {
+        p.puffTimer = 0.15;
+        this.spawnPuffSmoke(
+          p.x - Math.sin(p.rotY) * 0.28,
+          p.y + 0.2,
+          p.z - Math.cos(p.rotY) * 0.28,
+          1,
+          0.88
+        );
+      }
+    } else {
+      p.puffTimer = 0;
+    }
     if (p.throwCooldown <= 0) {
       if (p.holdingItem) {
         p.bobi.playAnimation(speedH > 0.6 ? 'CHR_Base_CarryWalk' : 'CHR_Base_CarryIdle', 0.12);
@@ -2334,7 +2771,7 @@ export class Game3DApp {
           this.rumbleAllActive(0.5, 110);
           this.emitBurst(hitObs.x, 1.4, hitObs.z, 0x67e8f9, 26);
           this.spawnFloatingText('💥 VỠ KÍNH! ĐƯỜNG THÔNG!', hitObs.x, 2.2, hitObs.z, '#22d3ee');
-          this.ui.addFeedPill('<span>🪟 Cửa kính vỡ tan!</span><b style="color:#00cec9;">Thông thoáng!</b>', 'glass');
+          this.ui.addFeedPill('<span>🪟 Vỡ kính!</span><b style="color:#0284c7;">Mở lối</b>', 'glass');
         }
       }
 
@@ -2344,26 +2781,29 @@ export class Game3DApp {
         for (const catcher of this.players) {
           if (catcher.holdingItem || catcher.stunTimer > 0) continue;
           if (catcher === it.thrownBy) continue;
-          if (Math.hypot(it.x - catcher.x, it.z - catcher.z) < 1.25 && Math.abs(it.y - (catcher.y + 0.85)) < 1.15) {
+          if (Math.hypot(it.x - catcher.x, it.z - catcher.z) < 1.35 && Math.abs(it.y - (catcher.y + 0.85)) < 1.2) {
             catcher.holdingItem = it;
+            catcher.catchBoostTimer = 2.5;
             it.isHeld = true;
             it.heldBy = catcher;
+            it.lastOwnerVariant = catcher.variant;
             it.vx = it.vy = it.vz = it.vrot = 0;
             catcher.bobi.carryMount.add(it.mesh);
             it.mesh.position.set(0, 0.15, 0);
             it.mesh.rotation.set(0, 0, 0);
             catcher.bobi.playAnimation('CHR_Base_PickUp', 0.08);
-            soundManager.grab();
-            let text = '🤝 BẮT ĐỒ! 📦';
+            soundManager.catchAir();
+            this.emitBurst(catcher.x, catcher.y + 1.0, catcher.z, 0x38bdf8, 14);
+            let text = '⚡ BẮT ĐỒ! +LỰC NÉM!';
             if (it.coopPassEligible) {
               it.coopPassEligible = false;
-              const passBonus = 200000;
+              const passBonus = 250000;
               this.score += passBonus;
-              text = `🤝 CHUYỀN CHUẨN! +${passBonus.toLocaleString()}đ`;
-              this.ui.addFeedPill(`<span>🤝 Bắt đồ ăn ý: ${it.name}</span><b style="color:#38bdf8;">+${passBonus.toLocaleString()}đ</b>`, 'glass');
+              text = `⚡ CHUYỀN CHUẨN! +${passBonus.toLocaleString()}đ`;
+              this.ui.addFeedPill(`<span>⚡ Chuyền: ${it.name}</span><b style="color:#0284c7;">+${passBonus.toLocaleString()}đ</b>`, 'glass');
             }
             this.spawnFloatingText(text, catcher.x, catcher.y + 2.0, catcher.z, '#38bdf8');
-            this.pushNetEvent('coop_pass', { x: catcher.x, y: catcher.y + 2.0, z: catcher.z, text });
+            this.pushNetEvent('coop_pass', { x: catcher.x, y: catcher.y + 2.0, z: catcher.z, text, air: true });
             return;
           }
         }
@@ -2388,22 +2828,40 @@ export class Game3DApp {
         }
       }
 
-      // Check Truck Bed Delivery (works across all truck rotations)
+      // Check Truck Bed Delivery (Combo Chain + Cargo Stack + Suspension Bounce)
       const tk = def.truck;
-      if (isInsideTruckBed(tk, it.x, it.z) && it.y >= 0.0 && it.y <= 1.35) {
+      if (isInsideTruckBed(tk, it.x, it.z) && it.y >= 0.0 && it.y <= 1.45) {
         it.isDelivered = true;
-        it.y = 0.65;
         it.vx = it.vy = it.vz = it.vrot = 0;
-        it.mesh.position.set(it.x, it.y, it.z);
+        this.mountDeliveredItemInTruck(it);
+
+        this.deliveryCombo = this.comboTimer > 0 ? this.deliveryCombo + 1 : 1;
+        this.comboTimer = 5.5;
+        const comboBonus = this.deliveryCombo >= 2 ? Math.min(4, this.deliveryCombo - 1) * 350000 : 0;
+        const totalGain = it.value + comboBonus;
+
         this.itemsDelivered++;
-        this.score += it.value;
+        this.score += totalGain;
         this.cameraShake = 0.2;
+        this.truckBounceVel = it.isSuperHeavy ? -3.4 : (it.isHeavy ? -2.6 : -1.8);
+
         if (it.type === 'piano') soundManager.pianoChord();
-        else soundManager.deliver();
+        else if (it.isLiving) {
+          soundManager.petSound();
+          soundManager.deliver(this.deliveryCombo);
+        } else {
+          soundManager.deliver(this.deliveryCombo);
+        }
+
         this.rumbleAllActive(0.35, 90);
-        this.emitBurst(it.x, it.y + 0.5, it.z, 0x22c55e, 22);
-        this.spawnFloatingText(`AN TOÀN! +${it.value.toLocaleString()}đ`, it.x, 2.2, it.z, '#22c55e');
-        this.ui.addFeedPill(`<span>🚚 Lên xe: ${it.name}</span><b style="color:#2ecc71;">+${it.value.toLocaleString()}đ</b>`);
+        this.emitBurst(it.x, 1.1, it.z, comboBonus > 0 ? 0xfacc15 : 0x22c55e, comboBonus > 0 ? 28 : 22);
+        if (comboBonus > 0) {
+          this.spawnFloatingText(`🔥 x${this.deliveryCombo}! +${totalGain.toLocaleString()}đ`, it.x, 2.35, it.z, '#f59e0b');
+          this.ui.addFeedPill(`<span>🔥 x${this.deliveryCombo} ${it.name}</span><b>+${totalGain.toLocaleString()}đ</b>`, 'bounce');
+        } else {
+          this.spawnFloatingText(`+${it.value.toLocaleString()}đ`, it.x, 2.2, it.z, '#16a34a');
+          this.ui.addFeedPill(`<span>✓ ${it.name}</span><b>+${it.value.toLocaleString()}đ</b>`);
+        }
 
         if (this.itemsDelivered >= this.targetItemsCount) {
           setTimeout(() => this.endGame(), 1200);
@@ -2433,7 +2891,8 @@ export class Game3DApp {
       if (it.vy < -3.5) {
         this.players.forEach((p) => {
           if (p.stunTimer <= 0 && Math.hypot(it.x - p.x, it.z - p.z) < 0.7 && Math.abs(it.y - (p.y + 0.8)) < 0.75) {
-            p.stunTimer = 2.0;
+            const stunMult = this.getVariantPerk(p.variant).stunMult;
+            p.stunTimer = 2.0 * stunMult;
             p.squashY = 0.35;
             p.squashX = 1.55;
             this.detachHeldItem(p);
@@ -2457,10 +2916,12 @@ export class Game3DApp {
         return;
       }
 
-      // Ground / Floor Impact, Surface Physics & Fragile Check
+      // Ground / Floor Impact, Surface Physics, Fragile Check & Living/Bouncy props
       const floorY = this.getFloorHeightAt(it.x, it.z, it.y);
       if (it.y <= floorY && floorY > -1.0) {
-        if (it.isFragile && it.vy < -7.5) {
+        const chefSafe = it.lastOwnerVariant === 'chef' || it.thrownBy?.variant === 'chef';
+        const breakVel = chefSafe ? -9.8 : -7.5;
+        if (it.isFragile && it.vy < breakVel) {
           const penalty = Math.floor(it.value * 0.4);
           this.score = Math.max(0, this.score - penalty);
           this.matchStats.fragileBroken++;
@@ -2483,39 +2944,83 @@ export class Game3DApp {
             it.vx = it.vy = it.vz = it.vrot = 0;
             it.mesh.position.set(it.x, it.y, it.z);
             this.spawnFloatingText(`VỠ! ĐẶT LẠI TRONG NHÀ! -${penalty.toLocaleString()}đ`, it.x, it.y + 1.5, it.z, '#fb923c');
-            this.ui.addFeedPill(`<span>♻️ Vỡ ${it.name} (đặt lại trong nhà)</span><b style="color:#fb923c;">-${penalty.toLocaleString()}đ</b>`, 'broke');
+            this.ui.addFeedPill(`<span>♻️ ${it.name}</span><b style="color:#c2410c;">-${penalty.toLocaleString()}đ</b>`, 'broke');
             return;
           }
 
           it.isBroken = true;
           this.levelGroup.remove(it.mesh);
           this.landlordRage = Math.min(100, this.landlordRage + 30);
-          this.spawnFloatingText(`XOẢNG! VỠ NÁT! -${penalty.toLocaleString()}đ`, it.x, floorY + 1.5, it.z, '#ef4444');
-          this.ui.addFeedPill(`<span>💥 Vỡ nát: ${it.name}</span><b style="color:#ef4444;">-${penalty.toLocaleString()}đ</b>`, 'broke');
+          this.spawnFloatingText(`XOẢNG! -${penalty.toLocaleString()}đ`, it.x, floorY + 1.5, it.z, '#ef4444');
+          this.ui.addFeedPill(`<span>💥 ${it.name}</span><b style="color:#dc2626;">-${penalty.toLocaleString()}đ</b>`, 'broke');
 
           if (this.landlordRage >= 100) {
             setTimeout(() => this.endGame(), 900);
           }
           return;
         }
+        if (it.isFragile && chefSafe && it.vy < -7.5) {
+          this.spawnFloatingText('🍳 ĐỠ KHÉO!', it.x, floorY + 1.3, it.z, '#6ee7b7');
+          this.emitBurst(it.x, floorY + 0.25, it.z, 0x6ee7b7, 8);
+        }
 
         it.y = floorY;
-        it.vy = Math.abs(it.vy) > 2.8 ? -it.vy * 0.3 : 0;
+        const bounceFactor = it.isBouncy ? 0.64 : (it.isLiving ? 0.45 : 0.3);
+        const minBounceVel = it.isBouncy ? 1.8 : 2.8;
+        if (it.isBouncy && Math.abs(it.vy) > minBounceVel) {
+          this.emitBurst(it.x, floorY + 0.2, it.z, 0xfde68a, 6);
+        }
+        it.vy = Math.abs(it.vy) > minBounceVel ? -it.vy * bounceFactor : 0;
 
         const surf = this.mechanics ? this.mechanics.surfaceAt(it.x, it.z, floorY) : null;
-        const damp = Math.exp((surf?.slippery ? -1.4 : -16.0) * dt);
+        const dampRate = it.isRolling
+          ? (surf?.slippery ? -0.9 : -2.1)
+          : (surf?.slippery ? -1.4 : -16.0);
+        const damp = Math.exp(dampRate * dt);
         it.vx *= damp;
         it.vz *= damp;
-        it.vrot *= Math.exp(-10.0 * dt);
+        it.vrot *= Math.exp((it.isRolling ? -2.5 : -10.0) * dt);
+        if (it.isRolling && (Math.abs(it.vx) > 0.1 || Math.abs(it.vz) > 0.1)) {
+          it.mesh.rotation.z -= (it.vx / 0.38) * dt;
+          it.mesh.rotation.x += (it.vz / 0.38) * dt;
+        }
         if (surf && (Math.abs(surf.convX) > 0.01 || Math.abs(surf.convZ) > 0.01)) {
           const blend = Math.min(1, dt * 8);
           it.vx = THREE.MathUtils.lerp(it.vx, surf.convX, blend);
           it.vz = THREE.MathUtils.lerp(it.vz, surf.convZ, blend);
         }
+
+        // Living Pet hops around playfully near its home area!
+        if (it.isLiving && Math.abs(it.vy) < 0.25) {
+          it.hopTimer = (it.hopTimer ?? 1.2) - dt;
+          if (it.hopTimer <= 0) {
+            it.hopTimer = 1.4 + Math.random() * 1.9;
+            const toHomeX = it.spawnX - it.x;
+            const toHomeZ = it.spawnZ - it.z;
+            const distHome = Math.hypot(toHomeX, toHomeZ);
+            const ang = distHome > 2.4
+              ? Math.atan2(toHomeZ, toHomeX) + (Math.random() - 0.5) * 0.7
+              : Math.random() * Math.PI * 2;
+            it.vx = Math.cos(ang) * 2.4;
+            it.vz = Math.sin(ang) * 2.4;
+            it.vy = 3.7;
+            it.mesh.rotation.y = Math.atan2(it.vx, it.vz);
+            if (Math.random() < 0.45 && this.players[0] && Math.hypot(this.players[0].x - it.x, this.players[0].z - it.z) < 6.5) {
+              soundManager.petSound();
+            }
+          }
+        }
       }
 
       this.clampItemInBounds(it);
-      it.mesh.position.set(it.x, it.y, it.z);
+      if (it.isVibrating && Math.abs(it.vy) < 0.2) {
+        const vibNow = performance.now() * 0.045 + it.id * 1.7;
+        it.mesh.position.set(it.x + Math.sin(vibNow) * 0.018, it.y, it.z + Math.cos(vibNow * 1.2) * 0.014);
+        it.mesh.rotation.z = Math.sin(vibNow * 1.1) * 0.032;
+      } else {
+        it.mesh.position.set(it.x, it.y, it.z);
+        if (!it.isRolling) it.mesh.rotation.z = 0;
+      }
     });
   }
 
@@ -2543,10 +3048,13 @@ export class Game3DApp {
       }
     }
 
+    const perk = this.getVariantPerk(activeP.variant);
+    const catchBoost = (activeP.catchBoostTimer || 0) > 0 ? 1.18 : 1.0;
     const weightMult = it.isSuperHeavy ? 0.68 : (it.isHeavy ? 0.84 : 1.0);
-    const vx = dirX * 11.5 * power * weightMult;
-    const vz = dirZ * 11.5 * power * weightMult;
-    const vy = 6.2 * power * weightMult;
+    const mult = power * weightMult * perk.throwMult * catchBoost;
+    const vx = dirX * 11.5 * mult;
+    const vz = dirZ * 11.5 * mult;
+    const vy = 6.2 * mult;
 
     for (let i = 0; i < this.trajectoryDots.length; i++) {
       const t = (i + 1) * 0.08;
@@ -2557,6 +3065,30 @@ export class Game3DApp {
         activeP.z + vz * t
       );
       dot.visible = true;
+    }
+  }
+
+  spawnPuffSmoke(x, y, z, count = 2, scale = 1.0) {
+    for (let i = 0; i < count; i++) {
+      const m = new THREE.Mesh(this.sharedPuffGeo, this.puffMat);
+      m.position.set(
+        x + (Math.random() - 0.5) * 0.35,
+        y + Math.random() * 0.12,
+        z + (Math.random() - 0.5) * 0.35
+      );
+      const baseScale = scale * (0.75 + Math.random() * 0.45);
+      m.scale.setScalar(baseScale);
+      this.levelGroup.add(m);
+      this.particles.push({
+        mesh: m,
+        isPuff: true,
+        baseScale,
+        vx: (Math.random() - 0.5) * 1.4,
+        vy: 0.9 + Math.random() * 0.8,
+        vz: (Math.random() - 0.5) * 1.4,
+        life: 0.38 + Math.random() * 0.16,
+        maxLife: 0.52
+      });
     }
   }
 
@@ -2589,13 +3121,24 @@ export class Game3DApp {
         this.particles.splice(i, 1);
         continue;
       }
-      pt.vy -= 14 * dt;
-      pt.mesh.position.x += pt.vx * dt;
-      pt.mesh.position.y += pt.vy * dt;
-      pt.mesh.position.z += pt.vz * dt;
-      pt.mesh.rotation.x += 6 * dt;
-      pt.mesh.rotation.y += 6 * dt;
-      pt.mesh.scale.setScalar(Math.max(0.05, pt.life));
+      if (pt.isPuff) {
+        pt.mesh.position.x += pt.vx * dt;
+        pt.mesh.position.y += pt.vy * dt;
+        pt.mesh.position.z += pt.vz * dt;
+        pt.vx *= 0.92;
+        pt.vz *= 0.92;
+        const tNorm = Math.max(0, pt.life / (pt.maxLife || 0.5));
+        const puffScale = pt.baseScale * (0.4 + Math.sin(tNorm * Math.PI) * 1.15);
+        pt.mesh.scale.setScalar(Math.max(0.05, puffScale));
+      } else {
+        pt.vy -= 14 * dt;
+        pt.mesh.position.x += pt.vx * dt;
+        pt.mesh.position.y += pt.vy * dt;
+        pt.mesh.position.z += pt.vz * dt;
+        pt.mesh.rotation.x += 6 * dt;
+        pt.mesh.rotation.y += 6 * dt;
+        pt.mesh.scale.setScalar(Math.max(0.05, pt.life));
+      }
     }
   }
 
@@ -2636,7 +3179,9 @@ export class Game3DApp {
         bonusLabel: getLevelText(this.currentLevel).bonusLabel,
         bonusFailed: bonusState.failedLive,
         parTime: def.parTime || def.timeLimit,
-        elapsedSeconds: this.getElapsedSeconds()
+        elapsedSeconds: this.getElapsedSeconds(),
+        combo: this.deliveryCombo,
+        comboTimer: this.comboTimer
       }
     );
   }
@@ -2659,8 +3204,17 @@ export class Game3DApp {
       this.cameraShake = 0.25;
       this.spawnFloatingText('BẸP DÍ! 💫', ev.x, ev.y, ev.z, '#f472b6');
     } else if (ev.kind === 'coop_pass') {
-      soundManager.grab();
-      this.spawnFloatingText(ev.text || '🤝 BẮT ĐỒ! 📦', ev.x, ev.y, ev.z, '#38bdf8');
+      if (ev.air) soundManager.catchAir();
+      else soundManager.grab();
+      this.spawnFloatingText(ev.text || '⚡ BẮT ĐỒ! 📦', ev.x, ev.y, ev.z, '#38bdf8');
+    } else if (ev.kind === 'patrol_stun') {
+      soundManager.bonk();
+      this.emitBurst(ev.x, ev.y, ev.z, 0xfacc15, 16);
+      this.spawnFloatingText('💫 CHOÁNG LUÔN!', ev.x, ev.y + 1.0, ev.z, '#fde047');
+    } else if (ev.kind === 'dash_slap') {
+      soundManager.bonk();
+      this.emitBurst(ev.x, ev.y, ev.z, 0xf472b6, 12);
+      this.spawnFloatingText('👋 BẠP! TRÊU TÍ!', ev.x, ev.y + 0.5, ev.z, '#f472b6');
     } else if (ev.kind === 'switch_toggle') {
       soundManager.switchToggle(ev.on);
       this.emitBurst(ev.x, ev.y, ev.z, 0xfacc15, 10);
@@ -2688,7 +3242,7 @@ export class Game3DApp {
       this.emitBurst(ev.bx, ev.by, ev.bz, ev.color || 0xef4444, 22);
       const penText = ev.penalty ? ` -${ev.penalty.toLocaleString()}đ` : '';
       this.spawnFloatingText(`${t('mech_item_respawn')}${penText}`, ev.rx, ev.ry, ev.rz, '#fb923c');
-      this.ui.addFeedPill(`<span>♻️ ${ev.name}</span><b style="color:#fb923c;">-${(ev.penalty || 0).toLocaleString()}đ</b>`, 'broke');
+      this.ui.addFeedPill(`<span>♻️ ${ev.name}</span><b style="color:#c2410c;">-${(ev.penalty || 0).toLocaleString()}đ</b>`, 'broke');
     }
   }
 
@@ -2732,13 +3286,25 @@ export class Game3DApp {
         it.isBroken = !!si.b;
 
         if (!wasDelivered && it.isDelivered) {
+          const netCombo = state.combo || 1;
           this.cameraShake = 0.2;
+          this.truckBounceVel = it.isSuperHeavy ? -3.4 : (it.isHeavy ? -2.6 : -1.8);
           if (it.type === 'piano') soundManager.pianoChord();
-          else soundManager.deliver();
+          else if (it.isLiving) {
+            soundManager.petSound();
+            soundManager.deliver(netCombo);
+          } else {
+            soundManager.deliver(netCombo);
+          }
           this.rumbleAllActive(0.35, 90);
-          this.emitBurst(si.x, 1.15, si.z, 0x22c55e, 22);
-          this.spawnFloatingText(`AN TOÀN! +${it.value.toLocaleString()}đ`, si.x, 2.2, si.z, '#22c55e');
-          this.ui.addFeedPill(`<span>🚚 Lên xe: ${it.name}</span><b style="color:#2ecc71;">+${it.value.toLocaleString()}đ</b>`);
+          this.emitBurst(si.x, 1.15, si.z, netCombo >= 2 ? 0xfacc15 : 0x22c55e, 24);
+          if (netCombo >= 2) {
+            this.spawnFloatingText(`🔥 x${netCombo}!`, si.x, 2.35, si.z, '#f59e0b');
+            this.ui.addFeedPill(`<span>🔥 x${netCombo} ${it.name}</span>`, 'bounce');
+          } else {
+            this.spawnFloatingText(`+${it.value.toLocaleString()}đ`, si.x, 2.2, si.z, '#16a34a');
+            this.ui.addFeedPill(`<span>✓ ${it.name}</span><b style="color:#15803d;">+${it.value.toLocaleString()}đ</b>`);
+          }
         }
 
         if (!wasBroken && it.isBroken) {
@@ -2749,12 +3315,16 @@ export class Game3DApp {
           soundManager.shatter();
           this.rumbleAllActive(0.55, 120);
           this.emitBurst(it.x, it.y + 0.3, it.z, 0xef4444, 24);
-          this.spawnFloatingText(`XOẢNG! VỠ NÁT! -${penalty.toLocaleString()}đ`, it.x, it.y + 1.5, it.z, '#ef4444');
-          this.ui.addFeedPill(`<span>💥 Vỡ nát: ${it.name}</span><b style="color:#ef4444;">-${penalty.toLocaleString()}đ</b>`, 'broke');
+          this.spawnFloatingText(`XOẢNG! -${penalty.toLocaleString()}đ`, it.x, it.y + 1.5, it.z, '#ef4444');
+          this.ui.addFeedPill(`<span>💥 ${it.name}</span><b style="color:#dc2626;">-${penalty.toLocaleString()}đ</b>`, 'broke');
         }
 
         if (it.isBroken) {
           if (it.mesh.parent) it.mesh.parent.remove(it.mesh);
+          return;
+        }
+        if (it.isDelivered) {
+          this.mountDeliveredItemInTruck(it);
           return;
         }
         if (si.h >= 0 && this.players[si.h]) {
@@ -2784,8 +3354,8 @@ export class Game3DApp {
           soundManager.glassShatter();
           this.rumbleAllActive(0.5, 110);
           this.emitBurst(w.x, 1.4, w.z, 0x67e8f9, 26);
-          this.spawnFloatingText('💥 VỠ KÍNH! ĐƯỜNG THÔNG!', w.x, 2.2, w.z, '#22d3ee');
-          this.ui.addFeedPill('<span>🪟 Cửa kính vỡ tan!</span><b style="color:#00cec9;">Thông thoáng!</b>', 'glass');
+          this.spawnFloatingText('💥 VỠ KÍNH!', w.x, 2.2, w.z, '#38bdf8');
+          this.ui.addFeedPill('<span>🪟 Vỡ kính!</span><b style="color:#0284c7;">Mở lối</b>', 'glass');
         }
       });
     }
@@ -2808,6 +3378,8 @@ export class Game3DApp {
     this.score = state.score;
     this.timeLeft = state.timeLeft;
     this.landlordRage = state.landlordRage;
+    if (Number.isFinite(state.combo)) this.deliveryCombo = state.combo;
+    if (Number.isFinite(state.comboTimer)) this.comboTimer = state.comboTimer;
 
     if (state.isGameOver && this.gameState === 'PLAYING') {
       this.endGame();
@@ -2922,6 +3494,19 @@ export class Game3DApp {
           this.players[0].bobi.update(dt, false);
         }
       } else if (this.gameState === 'PLAYING') {
+        if (!isLanClient && this.comboTimer > 0) {
+          this.comboTimer = Math.max(0, this.comboTimer - dt);
+          if (this.comboTimer === 0) this.deliveryCombo = 0;
+        }
+        const truckBody = this.truck?.mesh?.userData?.bodyGroup;
+        if (truckBody) {
+          const accel = -165 * this.truckBounceOffset - 11 * this.truckBounceVel;
+          this.truckBounceVel += accel * dt;
+          this.truckBounceOffset += this.truckBounceVel * dt;
+          truckBody.position.y = this.truckBounceOffset;
+          truckBody.rotation.z = this.truckBounceOffset * 0.14;
+        }
+
         this.updateMechanics(dt, isLanClient);
         this.updatePlayers(dt);
         this.updateTrajectoryVisual();
@@ -2956,13 +3541,33 @@ export class Game3DApp {
         this.updateParticles(dt);
       }
 
-      // Smooth rotatable camera orbit + gentle follow targeting the local player (centered diorama during MENU)
+      // Smooth rotatable camera orbit + dynamic zoom & follow targeting local player (or 2P midpoint)
       this.camAngle = THREE.MathUtils.lerp(this.camAngle, this.targetCamAngle, Math.min(1, dt * 10));
+      const curDef = LEVELS_3D[this.currentLevel];
+      const mapZoomBase = 1.0 + Math.max(0, (curDef?.floorSize?.w || 26) - 26) * 0.024;
       const camTargetPlayer = (isLanClient && this.players[1]) ? this.players[1] : this.players[0];
-      const targetFX = this.gameState === 'MENU' ? 0 : (camTargetPlayer ? THREE.MathUtils.clamp(camTargetPlayer.x * 0.45, -4, 4) : 0);
-      const targetFZ = this.gameState === 'MENU' ? 0 : (camTargetPlayer ? THREE.MathUtils.clamp(camTargetPlayer.z * 0.35, -3, 3) : 0);
+
+      let targetFX = 0;
+      let targetFZ = 0;
+      let targetZoom = mapZoomBase;
+      if (this.gameState !== 'MENU') {
+        if (this.gameMode === 'LOCAL_2P' && this.players.length > 1) {
+          const p1 = this.players[0];
+          const p2 = this.players[1];
+          const midX = (p1.x + p2.x) * 0.5;
+          const midZ = (p1.z + p2.z) * 0.5;
+          const pairDist = Math.hypot(p1.x - p2.x, p1.z - p2.z);
+          targetFX = THREE.MathUtils.clamp(midX * 0.52, -7.5, 7.5);
+          targetFZ = THREE.MathUtils.clamp(midZ * 0.42, -5.0, 5.0);
+          targetZoom = THREE.MathUtils.clamp(mapZoomBase + Math.max(0, pairDist - 7.5) * 0.032, 1.0, 1.44);
+        } else if (camTargetPlayer) {
+          targetFX = THREE.MathUtils.clamp(camTargetPlayer.x * 0.52, -7.5, 7.5);
+          targetFZ = THREE.MathUtils.clamp(camTargetPlayer.z * 0.42, -5.0, 5.0);
+        }
+      }
       this.camFocusX = THREE.MathUtils.lerp(this.camFocusX || 0, targetFX, Math.min(1, dt * 5));
       this.camFocusZ = THREE.MathUtils.lerp(this.camFocusZ || 0, targetFZ, Math.min(1, dt * 5));
+      this.camZoom = THREE.MathUtils.lerp(this.camZoom || 1.0, targetZoom, Math.min(1, dt * 3.5));
 
       let shakeX = 0, shakeY = 0;
       if (this.cameraShake > 0) {
@@ -3031,6 +3636,8 @@ export class Game3DApp {
       score: this.score,
       timeLeft: this.timeLeft,
       landlordRage: this.landlordRage,
+      combo: this.deliveryCombo,
+      comboTimer: r2(this.comboTimer),
       isGameOver: this.gameState === 'GAMEOVER'
     });
   }

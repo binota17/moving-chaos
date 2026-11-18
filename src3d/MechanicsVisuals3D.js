@@ -380,7 +380,13 @@ export function buildMechanicsVisuals(mech, group) {
 
       refs.hazards.forEach(({ hz, mesh }) => {
         mesh.position.set(hz.x, 0, hz.z);
-        mesh.rotation.y = hz.rotY;
+        if (hz.stunTimer > 0) {
+          mesh.rotation.y = hz.rotY + clock * 14;
+          mesh.rotation.z = Math.sin(clock * 26) * 0.25;
+        } else {
+          mesh.rotation.y = hz.rotY;
+          mesh.rotation.z = 0;
+        }
         if (mesh.userData.bob) mesh.position.y = 0.15 + Math.sin(clock * 3 + hz.phase) * 0.12;
         if (mesh.userData.brakeMat) mesh.userData.brakeMat.color.setHex(hz.stopped ? 0xff2222 : 0x7f1d1d);
       });
