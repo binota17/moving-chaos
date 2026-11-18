@@ -213,8 +213,9 @@ export function buildLevelSetDressing3D(def, levelGroup, { lvlId = 1 } = {}) {
   const roads = def.roads || [];
   const zones = def.houseZones || (def.houseBounds ? [def.houseBounds] : []);
 
-  // 1. Bright Concrete Sidewalk Borders flanking roads
-  const curbMat = new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.75 });
+  // 1. Bright Concrete / Deck Sidewalk Borders flanking roads
+  const isSciFi = def.chapter === 4 || lvlId >= 13;
+  const curbMat = new THREE.MeshStandardMaterial({ color: isSciFi ? 0x334155 : 0xe5e7eb, roughness: isSciFi ? 0.5 : 0.75, metalness: isSciFi ? 0.35 : 0 });
   roads.forEach((rd) => {
     if (rd.lanes === 'z') {
       [-1, 1].forEach((side) => {
@@ -231,18 +232,6 @@ export function buildLevelSetDressing3D(def, levelGroup, { lvlId = 1 } = {}) {
     }
   });
 
-  // 2. Instanced Grass Tufts scattered across dynamic lawn size (1 draw call)
-  const yardSpanW = (def.floorSize?.w || 26) + 8;
-  const yardSpanD = (def.floorSize?.d || 18) + 6;
-  const tuftGeo = new THREE.ConeGeometry(0.08, 0.24, 4);
-  tuftGeo.translate(0, 0.12, 0);
-  const tuftMat = new THREE.MeshStandardMaterial({ color: 0x99e265, roughness: 0.8 });
-  const maxTufts = 220;
-  const tufts = new THREE.InstancedMesh(tuftGeo, tuftMat, maxTufts);
-  tufts.receiveShadow = true;
-  const dummy = new THREE.Object3D();
-  let placed = 0;
-
   const insideAnyZone = (px, pz) => {
     for (const z of zones) {
       if (px > z.minX - 0.6 && px < z.maxX + 0.6 && pz > z.minZ - 0.6 && pz < z.maxZ + 0.6) return true;
@@ -255,6 +244,57 @@ export function buildLevelSetDressing3D(def, levelGroup, { lvlId = 1 } = {}) {
     }
     return false;
   };
+
+  if (isSciFi) {
+    // Sci-Fi Spaceport / Lab Perimeter Beacons & Orbital Antenna Towers
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.45, roughness: 0.4 });
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const magGlowMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
+    const beaconSpots = [
+      [b.minX - 2.0, b.minZ - 1.0, true],
+      [b.minX - 2.0, b.maxZ + 0.8, false],
+      [b.minX + 2.5, b.minZ - 2.2, false],
+      [b.maxX + 1.8, b.minZ - 1.0, true],
+      [b.maxX + 1.8, b.maxZ + 0.8, false]
+    ];
+    beaconSpots.forEach(([bx, bz, tall], idx) => {
+      if (insideAnyZone(bx, bz)) return;
+      const g = new THREE.Group();
+      const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.56, 0.5, 8), baseMat);
+      ped.position.y = 0.25;
+      ped.castShadow = true;
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.16, tall ? 3.2 : 1.7, 8), baseMat);
+      mast.position.y = tall ? 1.8 : 1.05;
+      mast.castShadow = true;
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.32, 0.06, 8, 16),
+        idx % 2 === 0 ? glowMat : magGlowMat
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = tall ? 3.1 : 1.75;
+      const orb = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.22, 0),
+        idx % 2 === 0 ? glowMat : magGlowMat
+      );
+      orb.position.y = tall ? 3.55 : 2.1;
+      g.add(ped, mast, ring, orb);
+      g.position.set(bx, -0.02, bz);
+      levelGroup.add(g);
+    });
+    return;
+  }
+
+  // 2. Instanced Grass Tufts scattered across dynamic lawn size (1 draw call)
+  const yardSpanW = (def.floorSize?.w || 26) + 8;
+  const yardSpanD = (def.floorSize?.d || 18) + 6;
+  const tuftGeo = new THREE.ConeGeometry(0.08, 0.24, 4);
+  tuftGeo.translate(0, 0.12, 0);
+  const tuftMat = new THREE.MeshStandardMaterial({ color: 0x99e265, roughness: 0.8 });
+  const maxTufts = 220;
+  const tufts = new THREE.InstancedMesh(tuftGeo, tuftMat, maxTufts);
+  tufts.receiveShadow = true;
+  const dummy = new THREE.Object3D();
+  let placed = 0;
 
   for (let i = 0; i < 600 && placed < maxTufts; i++) {
     // Deterministic pseudo-random scatter

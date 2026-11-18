@@ -33,13 +33,20 @@ const server = http.createServer((req, res) => {
   // CORS & headers
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  let reqPath = decodeURI(req.url.split('?')[0]);
+  let reqPath;
+  try {
+    reqPath = decodeURI((req.url || '/').split('?')[0]);
+  } catch {
+    res.writeHead(400);
+    res.end('400 Bad Request');
+    return;
+  }
   if (reqPath === '/' || reqPath === '' || reqPath === '/index.html') reqPath = '/moving_chaos.html';
 
-  const filePath = path.join(ROOT_DIR, reqPath);
+  const filePath = path.resolve(ROOT_DIR, '.' + reqPath);
 
   // Security: prevent path traversal
-  if (!filePath.startsWith(ROOT_DIR)) {
+  if (filePath !== ROOT_DIR && !filePath.startsWith(ROOT_DIR + path.sep)) {
     res.writeHead(403);
     res.end('403 Forbidden');
     return;

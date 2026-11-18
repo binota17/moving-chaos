@@ -534,6 +534,72 @@ function buildYachtHelm() {
   return g;
 }
 
+function buildLabBench(w, h, d) {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(w, h - 0.08, d), stdMat(0xe2e8f0, 0.35, 0.3));
+  base.position.y = (h - 0.08) * 0.5;
+  base.castShadow = true;
+  const top = new THREE.Mesh(new THREE.BoxGeometry(w + 0.08, 0.09, d + 0.08), stdMat(0x0f172a, 0.25, 0.4));
+  top.position.y = h - 0.04;
+  g.add(base, top);
+  [-0.55, 0.55].forEach((bx, idx) => {
+    const vial = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.11, 0.38, 12),
+      stdMat(idx === 0 ? 0x22d3ee : 0xa855f7, 0.1, 0.1, { emissive: idx === 0 ? 0x06b6d4 : 0x9333ea, emissiveIntensity: 0.7 })
+    );
+    vial.position.set(bx, h + 0.2, 0);
+    g.add(vial);
+  });
+  return g;
+}
+
+function buildServerRack(w, h, d) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stdMat(0x1e293b, 0.38, 0.72));
+  body.position.y = h * 0.5;
+  body.castShadow = true;
+  g.add(body);
+  for (let i = 0; i < 6; i++) {
+    const glow = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.78, 0.08, d + 0.03),
+      new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x22c55e : 0x38bdf8 })
+    );
+    glow.position.y = 0.35 + i * 0.28;
+    g.add(glow);
+  }
+  return g;
+}
+
+function buildCryoTank(w, h, d) {
+  const g = new THREE.Group();
+  const capMat = stdMat(0x334155, 0.35, 0.7);
+  const bot = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.45, w * 0.48, 0.28, 18), capMat);
+  bot.position.y = 0.14;
+  const tube = new THREE.Mesh(
+    new THREE.CylinderGeometry(w * 0.38, w * 0.38, h - 0.56, 18),
+    stdMat(0x67e8f9, 0.08, 0.1, { transparent: true, opacity: 0.55, emissive: 0x06b6d4, emissiveIntensity: 0.6 })
+  );
+  tube.position.y = h * 0.5;
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.46, w * 0.46, 0.28, 18), capMat);
+  top.position.y = h - 0.14;
+  g.add(bot, tube, top);
+  return g;
+}
+
+function buildSpotlightRig(w, h, d) {
+  const g = new THREE.Group();
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.32, h * 0.8, 12), stdMat(0x1e293b, 0.4, 0.7));
+  stand.position.y = h * 0.4;
+  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.44, 14), stdMat(0x334155, 0.3, 0.8));
+  head.rotation.x = Math.PI / 3;
+  head.position.set(0, h * 0.84, 0.1);
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.22, 14), new THREE.MeshBasicMaterial({ color: 0xfef08a }));
+  lens.position.set(0, h * 0.76, 0.28);
+  lens.rotation.x = 0.5;
+  g.add(stand, head, lens);
+  return g;
+}
+
 /**
  * Renders non-movable room fixtures (kitchen counters, tubs, shelves, desks, plants, art).
  */
@@ -561,6 +627,10 @@ export function buildArchitecturalFixtures3D(def, levelGroup) {
       case 'potted_plant': mesh = buildPottedPlant(); break;
       case 'wall_art': mesh = buildWallArt(f.variant ?? idx); break;
       case 'yacht_helm': mesh = buildYachtHelm(); break;
+      case 'lab_bench': mesh = buildLabBench(w || 2.6, h || 0.98, d || 0.9); break;
+      case 'server_rack': mesh = buildServerRack(w || 1.1, h || 2.15, d || 0.9); break;
+      case 'cryo_tank': mesh = buildCryoTank(w || 1.25, h || 2.25, d || 1.25); break;
+      case 'spotlight_rig': mesh = buildSpotlightRig(w || 0.9, h || 1.9, d || 0.9); break;
       default: break;
     }
 

@@ -156,16 +156,25 @@ function getFabricTex(base = '#e84118', weave = 'rgba(255,255,255,0.08)') {
 }
 
 function getTruckPadTex() {
-  return getProceduralTexture('truck_pad_v2', (ctx, s) => {
+  return getProceduralTexture('truck_pad_v3', (ctx, s) => {
     ctx.fillStyle = '#eef2f6';
     ctx.fillRect(0, 0, s, s);
-    ctx.strokeStyle = '#cbd5e1';
+    ctx.strokeStyle = '#94a3b8';
     ctx.lineWidth = 4;
     ctx.strokeRect(4, 4, s - 8, s - 8);
 
-    // Repeating Moving-Out style 4-way blue arrow loading tiles
+    // 3x3 Cargo bay grid lines + Moving-Out style 4-way blue arrows
     const cells = 3;
     const step = s / cells;
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.25)';
+    ctx.setLineDash([8, 6]);
+    ctx.lineWidth = 2;
+    for (let i = 1; i < cells; i++) {
+      ctx.beginPath(); ctx.moveTo(i * step, 6); ctx.lineTo(i * step, s - 6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(6, i * step); ctx.lineTo(s - 6, i * step); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
     ctx.fillStyle = '#3b82f6';
     for (let r = 0; r < cells; r++) {
       for (let c = 0; c < cells; c++) {
@@ -251,6 +260,18 @@ export function getFloorPatternTex(styleKey = 'polka_pink', baseHex = '#f47b8c')
         ctx.fillStyle = 'rgba(60,30,110,0.10)';
         ctx.fillRect(0, i * pw, s, 2);
       }
+    } else if (styleKey === 'lab_grid' || styleKey === 'space_deck') {
+      const cells = 4;
+      const cs = s / cells;
+      ctx.strokeStyle = styleKey === 'space_deck' ? 'rgba(56, 189, 248, 0.25)' : 'rgba(14, 165, 233, 0.20)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i <= cells; i++) {
+        ctx.beginPath(); ctx.moveTo(i * cs, 0); ctx.lineTo(i * cs, s); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i * cs); ctx.lineTo(s, i * cs); ctx.stroke();
+      }
+      ctx.fillStyle = styleKey === 'space_deck' ? 'rgba(14, 165, 233, 0.16)' : 'rgba(255, 255, 255, 0.18)';
+      ctx.fillRect(cs + 4, cs + 4, cs - 8, cs - 8);
+      ctx.fillRect(cs * 3 + 4, cs * 3 + 4, cs - 8, cs - 8);
     } else {
       // Industrial / Concrete / Warehouse clean floor tiles
       const cells = 4;
@@ -1306,6 +1327,95 @@ export function createPropMesh3D(itemDef) {
       break;
     }
 
+    case 'cryo_pod': {
+      const alloy = stdMat(0xe2e8f0, 0.28, 0.65);
+      const trim = stdMat(0x0284c7, 0.3, 0.4);
+      const glass = stdMat(0x67e8f9, 0.08, 0.15, { transparent: true, opacity: 0.58, emissive: 0x06b6d4, emissiveIntensity: 0.45 });
+      const base = new THREE.Mesh(createRoundedBoxGeo(0.92, 0.24, 1.38, 0.06, 2), alloy);
+      base.position.y = 0.12;
+      const capsule = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 1.15, 16), glass);
+      capsule.rotation.x = Math.PI / 2;
+      capsule.position.y = 0.52;
+      [-0.58, 0.58].forEach((cz) => {
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.39, 0.39, 0.16, 16), trim);
+        cap.rotation.x = Math.PI / 2;
+        cap.position.set(0, 0.52, cz);
+        group.add(cap);
+      });
+      group.add(base, capsule);
+      break;
+    }
+
+    case 'hologram': {
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.24, 16), stdMat(0x1e293b, 0.35, 0.7));
+      base.position.y = 0.12;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.30, 0.035, 8, 20), stdMat(0x22d3ee, 0.2, 0.2, { emissive: 0x22d3ee, emissiveIntensity: 0.9 }));
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 0.26;
+      const gem = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.28, 0),
+        stdMat(0x38bdf8, 0.08, 0.2, { transparent: true, opacity: 0.85, emissive: 0x7c3aed, emissiveIntensity: 0.8 })
+      );
+      gem.position.y = 0.68;
+      group.add(base, ring, gem);
+      break;
+    }
+
+    case 'crystal': {
+      const crate = new THREE.Mesh(createRoundedBoxGeo(0.68, 0.32, 0.68, 0.04, 2), stdMat(0x334155, 0.4, 0.6));
+      crate.position.y = 0.16;
+      const spireMat = stdMat(0xa855f7, 0.12, 0.15, { emissive: 0x9333ea, emissiveIntensity: 0.75 });
+      [[0, 0.54, 0, 0.16, 0.56], [-0.14, 0.44, 0.1, 0.1, 0.38], [0.14, 0.45, -0.08, 0.11, 0.4]].forEach(([x, y, z, r, h]) => {
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), spireMat);
+        sp.position.set(x, y, z);
+        group.add(sp);
+      });
+      group.add(crate);
+      break;
+    }
+
+    case 'satellite': {
+      const body = new THREE.Mesh(createRoundedBoxGeo(0.62, 0.44, 0.62, 0.04, 2), stdMat(0xfacc15, 0.25, 0.8));
+      body.position.y = 0.26;
+      const dish = new THREE.Mesh(new THREE.SphereGeometry(0.46, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.45), stdMat(0xf1f5f9, 0.22, 0.65));
+      dish.rotation.x = Math.PI + 0.5;
+      dish.position.set(0, 0.72, 0.08);
+      const wingMat = stdMat(0x1d4ed8, 0.22, 0.55);
+      [-0.64, 0.64].forEach((wx) => {
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.04, 0.38), wingMat);
+        wing.position.set(wx, 0.32, 0);
+        group.add(wing);
+      });
+      group.add(body, dish);
+      break;
+    }
+
+    case 'server_unit': {
+      const cab = new THREE.Mesh(createRoundedBoxGeo(0.76, 1.05, 0.66, 0.04, 2), stdMat(0x0f172a, 0.35, 0.75));
+      cab.position.y = 0.525;
+      const ledA = stdMat(0x22c55e, 0.2, 0, { emissive: 0x22c55e, emissiveIntensity: 1.1 });
+      const ledB = stdMat(0x38bdf8, 0.2, 0, { emissive: 0x38bdf8, emissiveIntensity: 1.1 });
+      for (let i = 0; i < 4; i++) {
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.08, 0.04), i % 2 === 0 ? ledA : ledB);
+        strip.position.set(0, 0.22 + i * 0.22, 0.34);
+        group.add(strip);
+      }
+      group.add(cab);
+      break;
+    }
+
+    case 'clapperboard': {
+      const board = new THREE.Mesh(createRoundedBoxGeo(0.72, 0.52, 0.14, 0.03, 1), stdMat(0x111827, 0.5));
+      board.position.y = 0.28;
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.12, 0.16), stdMat(0xf8fafc, 0.4));
+      arm.position.set(0, 0.60, 0);
+      arm.rotation.z = 0.18;
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.12, 0.16), stdMat(0xef4444, 0.35));
+      stripe.position.set(0, 0.16, 0);
+      group.add(board, arm, stripe);
+      break;
+    }
+
     default: {
       const cube = new THREE.Mesh(createRoundedBoxGeo(0.70, 0.62, 0.70, 0.05, 2), stdMat(0xf59e0b, 0.55));
       cube.position.y = 0.31;
@@ -1423,7 +1533,11 @@ export function createTruck3D() {
   railBack.position.set(0, 0.98, -2.3);
   const railFront = new THREE.Mesh(createRoundedBoxGeo(4.4, 1.15, 0.22, 0.04, 2), railMat);
   railFront.position.set(0, 1.08, 2.3);
-  bodyGroup.add(entryLip, railR, railRStripe, railBack, railFront);
+  const packStripMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+  const packStrip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.10, 4.1), packStripMat);
+  packStrip.position.set(-2.22, 0.58, 0);
+  truck.userData.packStripMat = packStripMat;
+  bodyGroup.add(entryLip, railR, railRStripe, railBack, railFront, packStrip);
 
   // Driver Cabin (Front - Coral Toybox Orange)
   const cab = new THREE.Mesh(createRoundedBoxGeo(4.2, 2.15, 2.3, 0.16, 2), stdMat(0xef4f27, 0.34, 0.1));

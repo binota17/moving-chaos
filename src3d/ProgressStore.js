@@ -7,6 +7,8 @@ const PROGRESS_KEY = 'moving_chaos_3d_progress_v1';
 
 const DEFAULT_SETTINGS = {
   lang: 'vi',
+  masterVolume: 1.0,
+  masterEnabled: true,
   bgmVolume: 0.7,
   sfxVolume: 0.85,
   bgmEnabled: true,
@@ -23,7 +25,8 @@ export const BOBI_SKINS = [
   { id: 'bubblegum', starsRequired: 4, tintHex: 0xfda4af, swatch: '#fda4af', labelVi: 'Kẹo Hồng', labelEn: 'Bubblegum' },
   { id: 'mint', starsRequired: 9, tintHex: 0x6ee7b7, swatch: '#6ee7b7', labelVi: 'Bạc Hà', labelEn: 'Mint' },
   { id: 'royal', starsRequired: 15, tintHex: 0xfef08a, swatch: '#facc15', labelVi: 'Hoàng Kim', labelEn: 'Royal Gold' },
-  { id: 'galaxy', starsRequired: 22, tintHex: 0xc084fc, swatch: '#c084fc', labelVi: 'Vũ Trụ', labelEn: 'Nebula' }
+  { id: 'galaxy', starsRequired: 22, tintHex: 0xc084fc, swatch: '#c084fc', labelVi: 'Vũ Trụ', labelEn: 'Nebula' },
+  { id: 'quantum', starsRequired: 28, tintHex: 0x22d3ee, swatch: '#22d3ee', labelVi: 'Lượng Tử', labelEn: 'Quantum' }
 ];
 
 export const MATCH_MODIFIERS = ['normal', 'turbo', 'bouncy', 'chill'];
@@ -58,6 +61,8 @@ export function loadSettings() {
   const validMod = MATCH_MODIFIERS.includes(saved.modifier) ? saved.modifier : 'normal';
   return {
     lang: saved.lang === 'en' ? 'en' : 'vi',
+    masterVolume: typeof saved.masterVolume === 'number' ? Math.max(0, Math.min(1, saved.masterVolume)) : DEFAULT_SETTINGS.masterVolume,
+    masterEnabled: typeof saved.masterEnabled === 'boolean' ? saved.masterEnabled : DEFAULT_SETTINGS.masterEnabled,
     bgmVolume: typeof saved.bgmVolume === 'number' ? Math.max(0, Math.min(1, saved.bgmVolume)) : DEFAULT_SETTINGS.bgmVolume,
     sfxVolume: typeof saved.sfxVolume === 'number' ? Math.max(0, Math.min(1, saved.sfxVolume)) : DEFAULT_SETTINGS.sfxVolume,
     bgmEnabled: typeof saved.bgmEnabled === 'boolean' ? saved.bgmEnabled : DEFAULT_SETTINGS.bgmEnabled,
@@ -152,7 +157,7 @@ export class ProgressStore {
     };
   }
 
-  getTotalStars(levelIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+  getTotalStars(levelIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
     let total = 0;
     for (const id of levelIds) {
       total += this.getLevelRecord(id).bestStars;

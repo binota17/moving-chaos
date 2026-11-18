@@ -17,6 +17,8 @@ export class GamepadManager {
       grab: false,
       throwHeld: false,
       dash: false,
+      slap: false,
+      ping: false,
       pause: false,
       camLeft: false,
       camRight: false
@@ -107,6 +109,8 @@ export class GamepadManager {
       const grabNow = this._btnDown(gp, 2) || this._btnDown(gp, 4) || this._btnDown(gp, 6); // X / LB / LT
       const throwNow = this._btnDown(gp, 1) || this._btnDown(gp, 5) || this._btnDown(gp, 7); // B / RB / RT
       const dashNow = this._btnDown(gp, 10); // L3 click (plus empty-handed B handled in Game3DApp)
+      const slapNow = this._btnDown(gp, 3); // Y / Triangle
+      const pingNow = this._btnDown(gp, 8) || this._btnDown(gp, 11); // View/Select or RS click
       const pauseNow = this._btnDown(gp, 9); // Start / Options
 
       // Right Stick horizontal flick orbits isometric camera
@@ -125,6 +129,8 @@ export class GamepadManager {
         justThrowStart: throwNow && !prev.throwHeld,
         justThrowRelease: !throwNow && prev.throwHeld,
         justDash: dashNow && !prev.dash,
+        justSlap: slapNow && !prev.slap,
+        justPing: pingNow && !prev.ping,
         justPause: pauseNow && !prev.pause,
         camRotateDir: (camLeftNow && !prev.camLeft) ? -1 : ((camRightNow && !prev.camRight) ? 1 : 0)
       };
@@ -133,6 +139,8 @@ export class GamepadManager {
       prev.grab = grabNow;
       prev.throwHeld = throwNow;
       prev.dash = dashNow;
+      prev.slap = slapNow;
+      prev.ping = pingNow;
       prev.pause = pauseNow;
       prev.camLeft = camLeftNow;
       prev.camRight = camRightNow;

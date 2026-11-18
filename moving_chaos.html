@@ -370,6 +370,8 @@
     .btn-jump { background: #bae6fd; }
     .btn-grab { background: var(--sunny); }
     .btn-throw { background: var(--coral); color: #fff; }
+    .btn-slap { background: #fbcfe8; }
+    .btn-ping { background: #cffafe; }
 
     /* Virtual Joystick */
     .touch-joystick-zone {
@@ -978,6 +980,10 @@
     .level-card[data-level="10"] { --lvl-color: #0ea5e9; }
     .level-card[data-level="11"] { --lvl-color: #475569; }
     .level-card[data-level="12"] { --lvl-color: #f59e0b; }
+    .level-card[data-level="13"] { --lvl-color: #38bdf8; }
+    .level-card[data-level="14"] { --lvl-color: #a855f7; }
+    .level-card[data-level="15"] { --lvl-color: #0284c7; }
+    .level-card[data-level="16"] { --lvl-color: #22d3ee; }
 
     /* 3D Overworld Town Hub HUD */
     #overworld-hud {
@@ -1173,7 +1179,60 @@
       background: var(--sunny);
       box-shadow: 0 2px 0 var(--ink);
     }
-    .vol-slider { width: 120px; accent-color: var(--coral); cursor: pointer; }
+    .vol-slider { width: 112px; accent-color: var(--coral); cursor: pointer; }
+    .mute-mini-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 2px solid var(--ink);
+      background: var(--paper-white);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 0 var(--ink);
+      transition: transform 0.1s, background 0.12s;
+    }
+    .mute-mini-btn:hover { background: var(--sunny); }
+    .mute-mini-btn.muted { background: #fee2e2; opacity: 0.78; }
+
+    /* Floating Quick Audio Mixer Popover (Menu, Overworld & In-Game HUD) */
+    .audio-mixer-popover {
+      position: absolute;
+      top: 64px;
+      right: 18px;
+      width: 284px;
+      background: var(--paper-bg);
+      border: 3px solid var(--ink);
+      border-radius: 18px;
+      padding: 12px 14px;
+      box-shadow: 0 8px 0 var(--ink);
+      z-index: 45;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      pointer-events: auto;
+      color: var(--ink);
+    }
+    .audio-mixer-popover.open { display: flex; }
+    .audio-popover-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 6px;
+      margin-bottom: 2px;
+      border-bottom: 2px dashed rgba(30, 36, 44, 0.16);
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .audio-mixer-popover .setting-row {
+      padding: 6px 0;
+      font-size: 12px;
+    }
+    .audio-mixer-popover .vol-slider { width: 96px; }
     .modal-actions { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
     .modal-actions-row { display: flex; gap: 9px; }
     .modal-actions-row button { flex: 1; }
@@ -1323,6 +1382,8 @@
         <button class="touch-btn btn-jump" id="touch-jump-btn" type="button">🦘 NHẢY</button>
         <button class="touch-btn btn-grab" id="touch-grab-btn" type="button">📦 NHẶT</button>
         <button class="touch-btn btn-throw" id="touch-throw-btn" type="button">🚀 NÉM</button>
+        <button class="touch-btn btn-slap" id="touch-slap-btn" type="button">👋 TÁT</button>
+        <button class="touch-btn btn-ping" id="touch-ping-btn" type="button">📍 PING</button>
       </div>
     </div>
 
@@ -1342,7 +1403,7 @@
           </svg>
           <div class="brand-titles">
             <div class="title-logo" id="logo-title">MOVING CHAOS</div>
-            <span class="star-counter-inline" id="total-stars-pill">★ 0/18</span>
+            <span class="star-counter-inline" id="total-stars-pill">★ 0/48</span>
           </div>
         </div>
 
@@ -1350,6 +1411,7 @@
           <span class="status-chip" id="gamepad-status-pill" style="display:none;">🎮 0</span>
           <button class="status-chip btn-chip" id="controls-toggle-btn" type="button">📖 Hướng dẫn</button>
           <button class="status-chip btn-chip" id="lang-toggle-btn" type="button">🇻🇳 VI</button>
+          <button class="status-chip btn-chip" id="menu-audio-btn" type="button" title="Âm lượng">🔊</button>
           <button class="status-chip btn-chip" id="menu-settings-btn" type="button" title="Cài đặt">⚙️</button>
           <a href="./moving_chaos_2d.html" class="status-chip btn-chip" id="link-2d-mode">2D</a>
         </div>
@@ -1494,7 +1556,7 @@
             </div>
           </div>
 
-          <button class="btn-secondary btn-map-select" id="open-map-select-btn" type="button">🗺️ Danh sách 12 Map</button>
+          <button class="btn-secondary btn-map-select" id="open-map-select-btn" type="button">🗺️ Danh sách 16 Map</button>
           <button class="btn-secondary btn-map-select" id="overworld-btn" type="button" style="background:#dcfce7;">🚐 Lái xe chọn Map</button>
 
           <button class="btn-main" id="start-play-btn" type="button">CHƠI NGAY</button>
@@ -1507,9 +1569,12 @@
       <div class="overworld-top-bar">
         <div class="brand-cluster">
           <span class="title-logo" style="font-size:18px;">MOVING CHAOS TOWN</span>
-          <span class="star-counter-inline" id="overworld-stars-pill">★ 0/36</span>
+          <span class="star-counter-inline" id="overworld-stars-pill">★ 0/48</span>
         </div>
-        <button class="status-chip btn-chip" id="overworld-back-btn" type="button">🏠 Menu</button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="status-chip btn-chip" id="overworld-audio-btn" type="button" title="Âm lượng">🔊</button>
+          <button class="status-chip btn-chip" id="overworld-back-btn" type="button">🏠 Menu</button>
+        </div>
       </div>
       <div class="overworld-bottom-wrap">
         <div class="overworld-card">
@@ -1520,7 +1585,7 @@
               <span class="level-stars" id="overworld-map-stars">☆☆☆</span>
             </div>
             <div class="spotlight-meta" id="overworld-map-meta">8 món • 80s • Par 55s</div>
-            <div class="overworld-hint" id="overworld-hint">Lái xe [WASD / Mũi tên] tới ô số 1–12 trên bản đồ!</div>
+            <div class="overworld-hint" id="overworld-hint">Lái xe [WASD / Mũi tên] tới ô số 1–16 trên bản đồ!</div>
           </div>
           <button class="btn-main" id="overworld-launch-btn" type="button">🚚 NHẬN HỢP ĐỒNG</button>
         </div>
@@ -1544,6 +1609,10 @@
           <div class="level-card" data-level="10"></div>
           <div class="level-card" data-level="11"></div>
           <div class="level-card" data-level="12"></div>
+          <div class="level-card" data-level="13"></div>
+          <div class="level-card" data-level="14"></div>
+          <div class="level-card" data-level="15"></div>
+          <div class="level-card" data-level="16"></div>
         </div>
         <div class="modal-actions">
           <button class="btn-main" id="map-select-close-btn" type="button" style="padding:10px 20px; font-size:15px;">ĐÓNG</button>
@@ -1585,8 +1654,18 @@
         </div>
 
         <div class="setting-row">
+          <span id="set-master-label">🔈 Âm lượng tổng</span>
+          <div class="setting-controls">
+            <button class="mute-mini-btn" id="set-master-mute" type="button" title="Tắt / Bật tiếng">🔊</button>
+            <input type="range" min="0" max="100" value="100" class="vol-slider" id="master-vol-slider">
+            <span id="master-vol-val" style="width:36px; text-align:right;">100%</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
           <span id="set-bgm-label">🎵 Nhạc nền</span>
           <div class="setting-controls">
+            <button class="mute-mini-btn" id="set-bgm-mute" type="button" title="Tắt / Bật nhạc nền">🎵</button>
             <input type="range" min="0" max="100" value="70" class="vol-slider" id="bgm-vol-slider">
             <span id="bgm-vol-val" style="width:36px; text-align:right;">70%</span>
           </div>
@@ -1595,6 +1674,7 @@
         <div class="setting-row">
           <span id="set-sfx-label">🔊 Hiệu ứng</span>
           <div class="setting-controls">
+            <button class="mute-mini-btn" id="set-sfx-mute" type="button" title="Tắt / Bật hiệu ứng">🔔</button>
             <input type="range" min="0" max="100" value="85" class="vol-slider" id="sfx-vol-slider">
             <span id="sfx-vol-val" style="width:36px; text-align:right;">85%</span>
           </div>
@@ -1650,6 +1730,38 @@
         <button class="btn-main" id="replay-btn" type="button">🔄 CHƠI LẠI</button>
         <button class="btn-secondary" id="end-overworld-btn" type="button" style="background:#dcfce7;">🚐 BẢN ĐỒ</button>
         <button class="btn-secondary" id="menu-back-btn" type="button">🏠 MENU</button>
+      </div>
+    </div>
+
+    <!-- QUICK AUDIO MIXER POPOVER -->
+    <div id="audio-popover" class="audio-mixer-popover" aria-label="Audio Mixer">
+      <div class="audio-popover-head">
+        <span id="audio-mixer-title">🎛️ ÂM THANH</span>
+        <button class="hint-close-btn" id="audio-popover-close" type="button" title="Đóng">✕</button>
+      </div>
+      <div class="setting-row">
+        <span id="mix-master-label">Tổng</span>
+        <div class="setting-controls">
+          <button class="mute-mini-btn" id="mix-master-mute" type="button">🔊</button>
+          <input type="range" min="0" max="100" value="100" class="vol-slider" id="mix-master-slider">
+          <span id="mix-master-val" style="width:34px; text-align:right;">100%</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <span id="mix-bgm-label">Nhạc</span>
+        <div class="setting-controls">
+          <button class="mute-mini-btn" id="mix-bgm-mute" type="button">🎵</button>
+          <input type="range" min="0" max="100" value="70" class="vol-slider" id="mix-bgm-slider">
+          <span id="mix-bgm-val" style="width:34px; text-align:right;">70%</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <span id="mix-sfx-label">SFX</span>
+        <div class="setting-controls">
+          <button class="mute-mini-btn" id="mix-sfx-mute" type="button">🔔</button>
+          <input type="range" min="0" max="100" value="85" class="vol-slider" id="mix-sfx-slider">
+          <span id="mix-sfx-val" style="width:34px; text-align:right;">85%</span>
+        </div>
       </div>
     </div>
   </div>

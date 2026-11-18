@@ -1264,5 +1264,418 @@ export const LEVELS_3D = {
       { type: 'briefcase', x: -0.2, y: 0, z: 2.8, name: 'Vali Bitcoin Lạnh', value: 160000000 },
       { type: 'pet', x: 0.8, y: 0, z: 0.0, name: 'Chó Quý Tộc Poodle', value: 35000000, isLiving: true }
     ]
+  },
+
+  // =========================================================================
+  // CHƯƠNG 4: PHÒNG THÍ NGHIỆM & TRẠM KHÔNG GIAN (MAPS 13–16)
+  // =========================================================================
+  13: {
+    id: 13,
+    chapter: 4,
+    name: 'Phòng Thí Nghiệm Đổi Trọng',
+    targetItems: 13,
+    timeLimit: 122,
+    parTime: 86,
+    bonusObjective: 'no_fragile_break',
+    bounds: { minX: -15.5, maxX: 15.5, minZ: -9.8, maxZ: 9.8 },
+    spawns: [
+      { x: -1.8, y: 0.1, z: -1.5 },
+      { x: -1.8, y: 0.1, z: 1.5 },
+      { x: -3.2, y: 0.1, z: -1.5 },
+      { x: -3.2, y: 0.1, z: 1.5 }
+    ],
+    floorSize: { w: 32, d: 21 },
+    floorColor: 0xbae6fd,
+    wallColor: 0x38bdf8,
+    houseZones: [
+      { minX: -13.6, maxX: 2.4, minZ: -8.2, maxZ: 8.2, color: 0xe0f2fe }
+    ],
+    rooms: [
+      { name: 'NW Cryo Bio-Lab', minX: -13.6, maxX: -5.4, minZ: -8.2, maxZ: 0.0, style: 'lab_grid', color: '#bae6fd' },
+      { name: 'SW Gravity Reactor', minX: -13.6, maxX: -5.4, minZ: 0.0, maxZ: 8.2, style: 'lab_grid', color: '#a7f3d0' },
+      { name: 'East Zero-G Airlock', minX: -5.4, maxX: 2.4, minZ: -8.2, maxZ: 8.2, style: 'space_deck', color: '#cbd5e1' }
+    ],
+    doors: [
+      { x: -5.4, z: -4.4, dir: 'z', width: 3.0, swingDir: -1, doorColor: 0x0284c7 },
+      { x: -5.4, z: 4.4, dir: 'z', width: 3.0, swingDir: 1, doorColor: 0x0284c7 },
+      { x: 2.4, z: 0.0, dir: 'z', width: 3.6, swingDir: 1, doorColor: 0x0ea5e9 }
+    ],
+    fixtures: [
+      { type: 'lab_bench', x: -12.2, z: -6.8, w: 2.2, d: 0.85, h: 0.92 },
+      { type: 'cryo_tank', x: -12.4, z: 6.4, w: 1.15, d: 1.15, h: 2.2 },
+      { type: 'server_rack', x: -8.6, z: -7.5, w: 1.6, d: 0.72, h: 2.1 }
+    ],
+    roads: [
+      { x: 9.8, z: 0, w: 6.0, d: 19.6, lanes: 'z' }
+    ],
+    platforms: [],
+    ramps: [],
+    walls: [
+      { x: -13.6, y: 1.7, z: 0, w: 0.4, h: 3.4, d: 16.8 },
+      { x: -5.6, y: 1.7, z: -8.2, w: 16.4, h: 3.4, d: 0.4 },
+      { x: -5.6, y: 1.7, z: 8.2, w: 16.4, h: 3.4, d: 0.4 },
+      { x: -5.4, y: 1.5, z: 0.0, w: 0.35, h: 3.0, d: 4.6, isInterior: true, wallHex: '#38bdf8' },
+      { x: 2.4, y: 1.7, z: -5.6, w: 0.35, h: 3.4, d: 5.2 },
+      { x: 2.4, y: 1.7, z: 5.6, w: 0.35, h: 3.4, d: 5.2 }
+    ],
+    windows: [
+      { id: 'w13_1', x: 2.4, y: 0, z: -2.4, w: 0.25, h: 2.8, d: 1.8, hp: 2, isBroken: false },
+      { id: 'w13_2', x: 2.4, y: 0, z: 2.4, w: 0.25, h: 2.8, d: 1.8, hp: 2, isBroken: false }
+    ],
+    switches: [
+      { id: 'm13_las', type: 'lever', x: -4.2, y: 0, z: -5.4, holdSeconds: 8.0, cooldownSeconds: 1.5 }
+    ],
+    lasers: [
+      { id: 'l13_1', x1: -5.4, z1: 3.0, x2: -5.4, z2: 5.8, y: 0.9, activeSeconds: 2.4, cooldownSeconds: 2.2, offset: 0, switchId: 'm13_las', invertSwitch: true }
+    ],
+    zones: [
+      { type: 'low_gravity', minX: -5.0, maxX: 1.8, minZ: -5.2, maxZ: 5.2, yMin: -0.5, yMax: 7.0, gravityScale: 0.42 }
+    ],
+    hazards: [
+      {
+        type: 'patrol', kind: 'guard', chaser: true, speed: 3.2, chaseSpeed: 4.4, chaseRange: 5.4, chaseRageTrigger: 35,
+        leashBounds: { minX: -5.0, maxX: 2.0, minZ: -7.5, maxZ: 7.5 },
+        loop: true, radius: 0.62, points: [[-3.8, -6.2], [1.0, -6.2], [1.0, 6.2], [-3.8, 6.2]]
+      }
+    ],
+    trampolines: [
+      { x: 4.6, y: 0, z: 0.0, r: 1.4 }
+    ],
+    truck: { x: 9.8, y: 0, z: 0.0, bedW: 4.5, bedD: 5.2, rotY: 0 },
+    items: [
+      { type: 'cryo_pod', x: -11.4, y: 0, z: -3.2, name: 'Khoang Đông Lạnh Mẫu X', value: 85000000, isSuperHeavy: true },
+      { type: 'server_unit', x: -7.8, y: 0, z: -5.4, name: 'Máy Chủ Phân Tích DNA', value: 58000000, isHeavy: true },
+      { type: 'hologram', x: -9.2, y: 0, z: -2.0, name: 'Máy Chiếu Hologram 3D', value: 64000000, isFragile: true },
+      { type: 'crystal', x: -11.8, y: 0, z: 2.4, name: 'Tinh Thể Plasma Xanh', value: 78000000, isFragile: true },
+      { type: 'crystal', x: -7.8, y: 0, z: 2.2, name: 'Lõi Năng Lượng Tím', value: 76000000, isFragile: true },
+      { type: 'fridge', x: -9.8, y: 0, z: 6.4, name: 'Tủ Bảo Quản Vacxin', value: 44000000, isHeavy: true },
+      { type: 'pc', x: -7.4, y: 0, z: -2.4, name: 'Siêu Máy Tính Lab', value: 52000000, isFragile: true },
+      { type: 'aquarium', x: -11.4, y: 0, z: -0.6, name: 'Bể Sứa Phát Sáng', value: 60000000, isFragile: true },
+      { type: 'safe', x: -7.4, y: 0, z: 6.6, name: 'Két Mẫu Vật Mật', value: 98000000, isSuperHeavy: true },
+      { type: 'toolbox', x: -3.6, y: 0, z: -6.4, name: 'Hộp Kìm Chống Bức Xạ', value: 18000000 },
+      { type: 'vase', x: -0.6, y: 0, z: 4.4, name: 'Ống Nghiệm Pha Lê', value: 42000000, isFragile: true },
+      { type: 'drum', x: -0.8, y: 0, z: -4.4, name: 'Bình Khí Nitơ Lỏng', value: 26000000, isRolling: true },
+      { type: 'pet', x: -3.4, y: 0, z: 3.4, name: 'Cún Thí Nghiệm Astro', value: 36000000, isLiving: true }
+    ]
+  },
+
+  14: {
+    id: 14,
+    chapter: 4,
+    name: 'Trạm Server Lượng Tử',
+    targetItems: 14,
+    timeLimit: 130,
+    parTime: 92,
+    bonusObjective: 'no_hazard_hit',
+    bounds: { minX: -16.0, maxX: 16.0, minZ: -10.2, maxZ: 10.2 },
+    spawns: [
+      { x: -4.4, y: 0.1, z: -1.6 },
+      { x: -4.4, y: 0.1, z: 1.6 },
+      { x: -5.8, y: 0.1, z: -1.6 },
+      { x: -5.8, y: 0.1, z: 1.6 }
+    ],
+    floorSize: { w: 34, d: 22 },
+    floorColor: 0xcbd5e1,
+    wallColor: 0xa855f7,
+    houseZones: [
+      { minX: -14.2, maxX: -2.8, minZ: -8.6, maxZ: 8.6, color: 0xe2e8f0 },
+      { minX: 3.4, maxX: 7.4, minZ: -8.6, maxZ: 8.6, color: 0xf1f5f9 }
+    ],
+    rooms: [
+      { name: 'West Mainframe Hall', minX: -14.2, maxX: -2.8, minZ: -8.6, maxZ: 8.6, style: 'space_deck', color: '#cbd5e1' },
+      { name: 'Quantum Mezzanine', minX: -13.8, maxX: -9.2, minZ: -4.2, maxZ: 4.2, y: 2.4, style: 'lab_grid', color: '#e9d5ff' },
+      { name: 'East Upload Pad', minX: 3.4, maxX: 7.4, minZ: -8.6, maxZ: 8.6, style: 'lab_grid', color: '#bae6fd' }
+    ],
+    doors: [
+      { x: -2.8, z: 0.0, dir: 'z', width: 3.2, swingDir: 1, doorColor: 0x7c3aed }
+    ],
+    fixtures: [
+      { type: 'server_rack', x: -12.8, z: -7.5, w: 1.8, d: 0.72, h: 2.1 },
+      { type: 'server_rack', x: -8.2, z: -7.5, w: 1.8, d: 0.72, h: 2.1 },
+      { type: 'lab_bench', x: -11.6, y: 2.4, z: 0.0, w: 1.6, d: 0.85, h: 0.92 },
+      { type: 'control_desk', x: 5.2, z: -7.4, w: 1.7, d: 0.72, h: 0.90 }
+    ],
+    roads: [
+      { x: 11.4, z: 0, w: 6.2, d: 20.8, lanes: 'z' }
+    ],
+    platforms: [
+      { x: -11.5, y: 2.4, z: 0.0, w: 4.6, d: 8.4 }
+    ],
+    ramps: [],
+    walls: [
+      { x: -14.2, y: 1.7, z: 0, w: 0.4, h: 3.4, d: 17.6 },
+      { x: -8.5, y: 1.7, z: -8.6, w: 11.8, h: 3.4, d: 0.4 },
+      { x: -8.5, y: 1.7, z: 8.6, w: 11.8, h: 3.4, d: 0.4 },
+      { x: -2.8, y: 1.7, z: -5.4, w: 0.35, h: 3.4, d: 6.4 },
+      { x: -2.8, y: 1.7, z: 5.4, w: 0.35, h: 3.4, d: 6.4 }
+    ],
+    windows: [],
+    pits: [
+      { minX: -2.8, maxX: 3.4, minZ: -8.4, maxZ: -1.8 },
+      { minX: -2.8, maxX: 3.4, minZ: 1.8, maxZ: 8.4 }
+    ],
+    switches: [
+      { id: 'm14_br', type: 'lever', x: -3.8, y: 0, z: -3.2, holdSeconds: 11.0, cooldownSeconds: 1.2 },
+      { id: 'm14_las', type: 'plate', x: -3.8, y: 0, z: 3.2, r: 0.9, holdSeconds: 7.0 }
+    ],
+    gates: [
+      { id: 'm14_bridge1', kind: 'bridge', x: 0.3, y: 0, z: -4.8, w: 6.6, d: 3.0, switchIds: ['m14_br'], speed: 3.2 }
+    ],
+    lasers: [
+      { id: 'l14_1', x1: -7.2, z1: -6.2, x2: -7.2, z2: -2.2, y: 0.9, activeSeconds: 2.2, cooldownSeconds: 2.4, offset: 0, switchId: 'm14_las', invertSwitch: true },
+      { id: 'l14_2', x1: -7.2, z1: 2.2, x2: -7.2, z2: 6.2, y: 0.9, activeSeconds: 2.2, cooldownSeconds: 2.4, offset: 2.2, switchId: 'm14_las', invertSwitch: true }
+    ],
+    elevators: [
+      { x: -7.6, z: 0.0, w: 2.8, d: 3.4, yMin: 0, yMax: 2.4, speed: 1.8, pauseSec: 1.2, offset: 0 }
+    ],
+    zones: [
+      { type: 'conveyor', minX: -12.6, maxX: -3.4, minZ: -1.3, maxZ: 1.3, y: 0, vx: 3.6, vz: 0 },
+      { type: 'low_gravity', minX: 3.8, maxX: 7.0, minZ: -4.6, maxZ: 4.6, yMin: -0.5, yMax: 7.0, gravityScale: 0.45 }
+    ],
+    hazards: [
+      {
+        type: 'patrol', kind: 'drone', chaser: true, speed: 3.6, chaseSpeed: 4.8, chaseRange: 5.5, chaseRageTrigger: 30,
+        leashBounds: { minX: -8.5, maxX: -3.2, minZ: -7.5, maxZ: 7.5 },
+        loop: true, radius: 0.62, points: [[-6.4, -6.2], [-3.8, -6.2], [-3.8, 6.2], [-6.4, 6.2]]
+      }
+    ],
+    trampolines: [
+      { x: 5.6, y: 0, z: -4.2, r: 1.35 },
+      { x: 5.6, y: 0, z: 4.2, r: 1.35 }
+    ],
+    truck: { x: 11.4, y: 0, z: 0.0, bedW: 4.5, bedD: 5.4, rotY: 0 },
+    items: [
+      { type: 'server_unit', x: -11.8, y: 2.4, z: -2.8, name: 'Cụm CPU Lượng Tử A', value: 88000000, isHeavy: true },
+      { type: 'cryo_pod', x: -11.8, y: 2.4, z: 2.8, name: 'Hệ Làm Mát Siêu Dẫn', value: 94000000, isSuperHeavy: true },
+      { type: 'hologram', x: -10.0, y: 2.4, z: -2.6, name: 'Màn Chiếu Ma Trận', value: 68000000, isFragile: true },
+      { type: 'crystal', x: -10.0, y: 2.4, z: 2.6, name: 'Chip Kim Cương Qubit', value: 82000000, isFragile: true },
+      { type: 'generator', x: -12.2, y: 0, z: -5.4, name: 'Nguồn Dự Phòng UPS', value: 72000000, isSuperHeavy: true, isVibrating: true },
+      { type: 'safe', x: -12.2, y: 0, z: 5.4, name: 'Két Ổ Cứng Mật', value: 120000000, isSuperHeavy: true },
+      { type: 'server_unit', x: -9.8, y: 0, z: 5.8, name: 'Tủ Server Backup B', value: 58000000, isHeavy: true },
+      { type: 'pc', x: -5.2, y: 0, z: -6.4, name: 'Máy Trạm Giám Sát', value: 54000000, isFragile: true },
+      { type: 'tv', x: -5.2, y: 0, z: 6.4, name: 'Màn Hình Radar Dữ Liệu', value: 48000000, isFragile: true },
+      { type: 'briefcase', x: -1.0, y: 0, z: 0.0, name: 'Vali Mã Khóa RSA', value: 75000000 },
+      { type: 'toolbox', x: -10.2, y: 0, z: -1.8, name: 'Bộ Cáp Quang Vàng', value: 24000000 },
+      { type: 'satellite', x: 5.2, y: 0, z: -5.6, name: 'Đĩa Vệ Tinh Thu Sóng', value: 78000000, isFragile: true },
+      { type: 'box', x: -5.4, y: 0, z: 1.6, name: 'Thùng RAM Siêu Tốc', value: 22000000 },
+      { type: 'drum', x: -9.4, y: 0, z: 1.8, name: 'Bình Làm Mát Argon', value: 28000000, isRolling: true }
+    ]
+  },
+
+  15: {
+    id: 15,
+    chapter: 4,
+    name: 'Phim Trường Sci-Fi Hollywood',
+    targetItems: 15,
+    timeLimit: 136,
+    parTime: 96,
+    bonusObjective: 'no_glass',
+    bounds: { minX: -16.2, maxX: 16.2, minZ: -10.5, maxZ: 10.5 },
+    spawns: [
+      { x: -1.6, y: 0.1, z: -1.4 },
+      { x: -1.6, y: 0.1, z: 1.4 },
+      { x: -3.2, y: 0.1, z: -1.4 },
+      { x: -3.2, y: 0.1, z: 1.4 }
+    ],
+    floorSize: { w: 34, d: 23 },
+    floorColor: 0x0ea5e9,
+    wallColor: 0x0284c7,
+    houseZones: [
+      { minX: -14.4, maxX: 2.2, minZ: -9.0, maxZ: 9.0, color: 0xe0f2fe }
+    ],
+    rooms: [
+      { name: 'Stage A • Alien Moon Set', minX: -14.4, maxX: -5.2, minZ: -9.0, maxZ: 0.0, style: 'space_deck', color: '#94a3b8' },
+      { name: 'Stage B • Starship Bridge', minX: -14.4, maxX: -5.2, minZ: 0.0, maxZ: 9.0, style: 'lab_grid', color: '#bae6fd' },
+      { name: 'Studio Backlot & Green Lounge', minX: -5.2, maxX: 2.2, minZ: -9.0, maxZ: 9.0, style: 'bistro_tile', color: '#fef3c7' }
+    ],
+    doors: [
+      { x: -5.2, z: -5.0, dir: 'z', width: 3.2, swingDir: -1, doorColor: 0x0369a1 },
+      { x: -5.2, z: 5.0, dir: 'z', width: 3.2, swingDir: 1, doorColor: 0x0369a1 },
+      { x: 2.2, z: 0.0, dir: 'z', width: 4.0, swingDir: 1, doorColor: 0x0ea5e9 }
+    ],
+    fixtures: [
+      { type: 'spotlight_rig', x: -12.6, z: -7.8, w: 1.2, d: 1.2, h: 2.4 },
+      { type: 'spotlight_rig', x: -12.6, z: 7.8, w: 1.2, d: 1.2, h: 2.4 },
+      { type: 'lab_bench', x: -9.2, z: 7.8, w: 2.2, d: 0.85, h: 0.92 },
+      { type: 'potted_plant', x: 1.4, z: -8.0 }
+    ],
+    roads: [
+      { x: 5.6, z: 0, w: 5.4, d: 21.2, lanes: 'z', crosswalk: 0.0 },
+      { x: 12.0, z: 0, w: 5.8, d: 21.2 }
+    ],
+    platforms: [],
+    ramps: [],
+    walls: [
+      { x: -14.4, y: 1.7, z: 0, w: 0.45, h: 3.4, d: 18.4 },
+      { x: -6.1, y: 1.7, z: -9.0, w: 17.0, h: 3.4, d: 0.45 },
+      { x: -6.1, y: 1.7, z: 9.0, w: 17.0, h: 3.4, d: 0.45 },
+      { x: -5.2, y: 1.5, z: 0.0, w: 0.35, h: 3.0, d: 5.2, isInterior: true, wallHex: '#38bdf8' },
+      { x: 2.2, y: 1.7, z: -6.4, w: 0.35, h: 3.4, d: 5.2 },
+      { x: 2.2, y: 1.7, z: 6.4, w: 0.35, h: 3.4, d: 5.2 }
+    ],
+    windows: [
+      { id: 'w15_1', x: 2.2, y: 0, z: -3.0, w: 0.25, h: 2.8, d: 1.9, hp: 2, isBroken: false },
+      { id: 'w15_2', x: 2.2, y: 0, z: 3.0, w: 0.25, h: 2.8, d: 1.9, hp: 2, isBroken: false }
+    ],
+    switches: [
+      { id: 'm15_traffic', type: 'lever', style: 'traffic', x: 2.4, y: 0, z: 0.0, holdSeconds: 7.0, cooldownSeconds: 3.0 }
+    ],
+    lasers: [
+      { id: 'l15_1', x1: -5.2, z1: -1.6, x2: -1.2, z2: -1.6, y: 0.9, activeSeconds: 2.4, cooldownSeconds: 2.6, offset: 0.5 }
+    ],
+    zones: [
+      { type: 'low_gravity', minX: -13.6, maxX: -6.0, minZ: -8.2, maxZ: -1.0, yMin: -0.5, yMax: 7.0, gravityScale: 0.38 }
+    ],
+    hazards: [
+      { type: 'car', axis: 'z', lane: 4.3, dir: 1, from: -11.5, to: 11.5, speed: 6.4, offset: 1.0, color: 0x38bdf8, stopSwitchId: 'm15_traffic' },
+      { type: 'car', axis: 'z', lane: 6.9, dir: -1, from: -11.5, to: 11.5, speed: 7.0, offset: 7.0, color: 0xa855f7, stopSwitchId: 'm15_traffic' },
+      {
+        type: 'patrol', kind: 'guard', chaser: true, speed: 3.3, chaseSpeed: 4.5, chaseRange: 5.2, chaseRageTrigger: 35,
+        leashBounds: { minX: -4.8, maxX: 1.8, minZ: -8.0, maxZ: 8.0 },
+        loop: true, radius: 0.62, points: [[-4.0, -6.4], [0.8, -6.4], [0.8, 6.4], [-4.0, 6.4]]
+      }
+    ],
+    trampolines: [
+      { x: 0.9, y: 0, z: -4.6, r: 1.35 },
+      { x: 0.9, y: 0, z: 4.6, r: 1.35 }
+    ],
+    truck: { x: 12.0, y: 0, z: 0.0, bedW: 4.5, bedD: 5.6, rotY: 0 },
+    items: [
+      { type: 'clapperboard', x: -11.6, y: 0, z: -4.8, name: 'Bảng Cảnh Quay Bom Tấn', value: 38000000 },
+      { type: 'satellite', x: -8.2, y: 0, z: -6.2, name: 'Vệ Tinh Đạo Cụ Phim', value: 84000000, isFragile: true },
+      { type: 'cryo_pod', x: -11.4, y: 0, z: 2.8, name: 'Buồng Ngủ Phi Hành Gia', value: 92000000, isSuperHeavy: true },
+      { type: 'hologram', x: -8.4, y: 0, z: 2.6, name: 'Bản Đồ Thiên Hà 3D', value: 74000000, isFragile: true },
+      { type: 'crystal', x: -8.2, y: 0, z: -2.6, name: 'Thiên Thạch Krypton', value: 76000000, isFragile: true },
+      { type: 'sofa', x: -1.8, y: 0, z: 6.4, name: 'Ghế Sofa Đạo Diễn', value: 42000000, isHeavy: true },
+      { type: 'piano', x: -12.0, y: 0, z: 5.4, name: 'Đàn Synth Giao Hưởng', value: 110000000, isSuperHeavy: true },
+      { type: 'server_unit', x: -8.0, y: 0, z: 5.6, name: 'Tủ Điều Khiển Kỹ Xảo', value: 62000000, isHeavy: true },
+      { type: 'tv', x: 0.6, y: 0, z: 6.4, name: 'Màn Hình Giám Sát Cảnh', value: 68000000, isFragile: true },
+      { type: 'statue', x: -3.2, y: 0, z: -6.4, name: 'Tượng Oscar Phi Hành', value: 88000000, isFragile: true },
+      { type: 'bookshelf', x: -1.6, y: 0, z: -6.6, name: 'Tủ Kịch Bản Sci-Fi', value: 36000000, isHeavy: true },
+      { type: 'drum', x: -10.8, y: 0, z: -2.2, name: 'Thùng Khói Kỹ Xảo', value: 24000000, isRolling: true },
+      { type: 'clapperboard', x: 0.2, y: 0, z: -2.4, name: 'Bảng Cắt Cảnh Final', value: 34000000 },
+      { type: 'briefcase', x: -3.4, y: 0, z: 2.6, name: 'Vali Cuộn Phim IMAX', value: 65000000 },
+      { type: 'pet', x: 0.4, y: 0, z: 1.6, name: 'Mèo Diễn Viên Không Gian', value: 45000000, isLiving: true }
+    ]
+  },
+
+  16: {
+    id: 16,
+    chapter: 4,
+    name: 'Trạm Không Gian Apex',
+    targetItems: 16,
+    timeLimit: 150,
+    parTime: 108,
+    bonusObjective: 'no_any_damage',
+    bounds: { minX: -16.5, maxX: 16.5, minZ: -11.0, maxZ: 11.0 },
+    spawns: [
+      { x: -1.6, y: 0.1, z: -1.6 },
+      { x: -1.6, y: 0.1, z: 1.6 },
+      { x: -3.2, y: 0.1, z: -1.6 },
+      { x: -3.2, y: 0.1, z: 1.6 }
+    ],
+    floorSize: { w: 35, d: 24 },
+    floorColor: 0x0f172a,
+    wallColor: 0x22d3ee,
+    houseZones: [
+      { minX: -14.8, maxX: 2.2, minZ: -9.2, maxZ: 9.2, color: 0xe2e8f0 }
+    ],
+    rooms: [
+      { name: 'NW Cryo Fusion Wing', minX: -14.8, maxX: -5.4, minZ: -9.2, maxZ: 0.0, style: 'lab_grid', color: '#bae6fd' },
+      { name: 'SW Quantum Hangar', minX: -14.8, maxX: -5.4, minZ: 0.0, maxZ: 9.2, style: 'space_deck', color: '#cbd5e1' },
+      { name: 'East Zero-G Atrium', minX: -5.4, maxX: 2.2, minZ: -9.2, maxZ: 9.2, style: 'space_deck', color: '#e0f2fe' },
+      { name: 'Upper Command Deck', minX: -14.3, maxX: -9.3, minZ: -4.2, maxZ: 4.2, y: 2.4, style: 'lab_grid', color: '#ddd6fe' }
+    ],
+    doors: [
+      { x: -5.4, z: -5.8, dir: 'z', width: 3.2, swingDir: -1, doorColor: 0x06b6d4 },
+      { x: -5.4, z: 5.8, dir: 'z', width: 3.2, swingDir: 1, doorColor: 0x06b6d4 },
+      { x: 2.2, z: 0.0, dir: 'z', width: 4.2, swingDir: 1, doorColor: 0x22d3ee }
+    ],
+    fixtures: [
+      { type: 'cryo_tank', x: -13.2, z: -7.8, w: 1.2, d: 1.2, h: 2.2 },
+      { type: 'server_rack', x: -8.6, z: -8.2, w: 1.8, d: 0.72, h: 2.1 },
+      { type: 'lab_bench', x: -12.6, y: 2.4, z: 0.0, w: 1.6, d: 0.85, h: 0.92 },
+      { type: 'spotlight_rig', x: 1.2, z: -8.0, w: 1.1, d: 1.1, h: 2.4 },
+      { type: 'spotlight_rig', x: 1.2, z: 8.0, w: 1.1, d: 1.1, h: 2.4 }
+    ],
+    roads: [
+      { x: 11.8, z: 0, w: 6.2, d: 21.8, lanes: 'z' }
+    ],
+    platforms: [
+      { x: -11.8, y: 2.4, z: 0.0, w: 5.0, d: 8.4 }
+    ],
+    ramps: [
+      { minX: -9.3, maxX: -6.0, minZ: -2.0, maxZ: 2.0, yStart: 0, yEnd: 2.4, axis: 'x', dir: -1 }
+    ],
+    walls: [
+      { x: -14.8, y: 1.7, z: 0, w: 0.45, h: 3.4, d: 18.8 },
+      { x: -6.3, y: 1.7, z: -9.2, w: 17.4, h: 3.4, d: 0.45 },
+      { x: -6.3, y: 1.7, z: 9.2, w: 17.4, h: 3.4, d: 0.45 },
+      { x: -5.4, y: 1.5, z: 0.0, w: 0.35, h: 3.0, d: 6.4, isInterior: true, wallHex: '#0ea5e9' },
+      { x: 2.2, y: 1.7, z: -6.6, w: 0.35, h: 3.4, d: 5.2 },
+      { x: 2.2, y: 1.7, z: 6.6, w: 0.35, h: 3.4, d: 5.2 }
+    ],
+    windows: [
+      { id: 'w16_1', x: 2.2, y: 0, z: -3.2, w: 0.25, h: 2.8, d: 2.0, hp: 2, isBroken: false },
+      { id: 'w16_2', x: 2.2, y: 0, z: 3.2, w: 0.25, h: 2.8, d: 2.0, hp: 2, isBroken: false }
+    ],
+    pits: [
+      { minX: 3.2, maxX: 7.4, minZ: -8.6, maxZ: -2.4 },
+      { minX: 3.2, maxX: 7.4, minZ: 2.4, maxZ: 8.6 }
+    ],
+    switches: [
+      { id: 'm16_las', type: 'lever', x: 2.5, y: 0, z: -1.8, holdSeconds: 9.0, cooldownSeconds: 1.5 },
+      { id: 'm16_br', type: 'plate', x: 2.5, y: 0, z: 1.8, r: 0.9, holdSeconds: 9.0 }
+    ],
+    gates: [
+      { id: 'm16_bridge', kind: 'bridge', x: 5.3, y: 0, z: -5.4, w: 4.6, d: 3.0, switchIds: ['m16_br'], speed: 3.2 }
+    ],
+    lasers: [
+      { id: 'l16_1', x1: -5.4, z1: -7.2, x2: -5.4, z2: -4.4, y: 0.9, activeSeconds: 2.2, cooldownSeconds: 2.4, offset: 0, switchId: 'm16_las', invertSwitch: true },
+      { id: 'l16_2', x1: -5.4, z1: 4.4, x2: -5.4, z2: 7.2, y: 0.9, activeSeconds: 2.2, cooldownSeconds: 2.4, offset: 2.2, switchId: 'm16_las', invertSwitch: true }
+    ],
+    elevators: [
+      { x: -11.8, z: -6.2, w: 2.8, d: 2.8, yMin: 0, yMax: 2.4, speed: 1.8, pauseSec: 1.2, offset: 0 }
+    ],
+    zones: [
+      { type: 'low_gravity', minX: -4.8, maxX: 1.6, minZ: -5.4, maxZ: 5.4, yMin: -0.5, yMax: 7.0, gravityScale: 0.36 },
+      { type: 'conveyor', minX: -13.6, maxX: -6.4, minZ: 5.6, maxZ: 8.2, y: 0, vx: 3.5, vz: 0 },
+      { type: 'wind', minX: 3.0, maxX: 7.8, minZ: -2.2, maxZ: 2.2, yMin: -1, yMax: 7, fx: 4.2, fz: 0, fanX: 2.8, fanZ: 0 }
+    ],
+    hazards: [
+      {
+        type: 'patrol', kind: 'drone', chaser: true, speed: 3.8, chaseSpeed: 5.0, chaseRange: 5.6, chaseRageTrigger: 30,
+        leashBounds: { minX: -4.8, maxX: 1.8, minZ: -8.2, maxZ: 8.2 },
+        loop: true, radius: 0.62, points: [[-4.0, -6.8], [0.8, -6.8], [0.8, 6.8], [-4.0, 6.8]]
+      },
+      {
+        type: 'patrol', kind: 'guard', chaser: true, speed: 3.1, chaseSpeed: 4.3, chaseRange: 4.8, chaseRageTrigger: 40,
+        leashBounds: { minX: -14.0, maxX: -6.0, minZ: -8.5, maxZ: 8.5 },
+        loop: true, radius: 0.62, points: [[-10.4, -7.2], [-6.6, -7.2], [-6.6, 7.2], [-10.4, 7.2]]
+      }
+    ],
+    trampolines: [
+      { x: 5.2, y: 0, z: 0.0, r: 1.4 },
+      { x: 0.9, y: 0, z: -6.8, r: 1.3 }
+    ],
+    truck: { x: 11.8, y: 0, z: 0.0, bedW: 4.6, bedD: 5.8, rotY: 0 },
+    items: [
+      { type: 'satellite', x: -11.8, y: 2.4, z: -2.4, name: 'Vệ Tinh Chỉ Huy Apex', value: 165000000, isFragile: true },
+      { type: 'safe', x: -11.8, y: 2.4, z: 2.4, name: 'Két Lõi Phản Vật Chất', value: 240000000, isSuperHeavy: true },
+      { type: 'hologram', x: -10.0, y: 2.4, z: 0.0, name: 'Bản Đồ Vũ Trụ Hologram', value: 110000000, isFragile: true },
+      { type: 'cryo_pod', x: -12.4, y: 0, z: -4.2, name: 'Khoang Đông Phi Hành Trưởng', value: 125000000, isSuperHeavy: true },
+      { type: 'server_unit', x: -7.8, y: 0, z: -6.2, name: 'Siêu Máy Chủ Điều Hướng', value: 78000000, isHeavy: true },
+      { type: 'crystal', x: -7.8, y: 0, z: -3.0, name: 'Tinh Thể Quang Tử Alpha', value: 98000000, isFragile: true },
+      { type: 'generator', x: -12.6, y: 0, z: 3.4, name: 'Lò Phản Ứng Mini', value: 115000000, isSuperHeavy: true, isVibrating: true },
+      { type: 'piano', x: -12.0, y: 0, z: 6.8, name: 'Đại Dương Cầm Không Trọng Lực', value: 175000000, isSuperHeavy: true },
+      { type: 'treasure', x: -7.6, y: 0, z: 6.8, name: 'Rương Thiên Thạch Vàng', value: 145000000 },
+      { type: 'pc', x: -7.6, y: 0, z: 3.2, name: 'Trạm Radar Không Gian', value: 84000000, isFragile: true },
+      { type: 'clapperboard', x: -2.2, y: 0, z: -6.6, name: 'Nhật Ký Sứ Mệnh Apex', value: 42000000 },
+      { type: 'aquarium', x: 0.2, y: 0, z: -4.6, name: 'Bể San Hô Vũ Trụ', value: 94000000, isFragile: true },
+      { type: 'crystal', x: 0.2, y: 0, z: 4.6, name: 'Lõi Sao Chổi Băng', value: 96000000, isFragile: true },
+      { type: 'drum', x: -2.4, y: 0, z: 6.6, name: 'Bình Nhiên Liệu Đẩy Ion', value: 32000000, isRolling: true },
+      { type: 'briefcase', x: -0.2, y: 0, z: 0.0, name: 'Vali Hộp Đen Trạm Vũ Trụ', value: 155000000 },
+      { type: 'pet', x: -2.6, y: 0, z: 2.6, name: 'Thú Cưng Robot Astro', value: 65000000, isLiving: true }
+    ]
   }
 };

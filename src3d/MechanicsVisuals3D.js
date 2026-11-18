@@ -96,6 +96,28 @@ function buildPatroller(kind) {
       w.position.set(x, 0.12, z);
       g.add(w);
     });
+  } else if (kind === 'guard') {
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.42, 1.02, 16), mat(0x1e3a8a));
+    body.position.y = 0.62;
+    const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.41, 0.41, 0.12, 16), mat(0xfacc15));
+    belt.position.y = 0.44;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), mat(0xfcd5b5));
+    head.position.y = 1.38;
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.3, 0.18, 14), mat(0x0f172a));
+    cap.position.y = 1.63;
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.05, 0.22), mat(0x0f172a));
+    visor.position.set(0, 1.56, 0.18);
+    g.add(body, belt, head, cap, visor);
+  } else if (kind === 'drone') {
+    const hull = new THREE.Mesh(new THREE.SphereGeometry(0.44, 16, 12), mat(0x334155, { metalness: 0.55, roughness: 0.25 }));
+    hull.position.y = 0.95;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.06, 8, 22), mat(0x38bdf8, { emissive: 0x0284c7, emissiveIntensity: 0.6 }));
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.95;
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10), new THREE.MeshBasicMaterial({ color: 0xff2a6d }));
+    eye.position.set(0, 0.95, 0.38);
+    g.add(hull, ring, eye);
+    g.userData.bob = true;
   } else {
     // Chef
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 1.0, 16), mat(0xf8fafc));
@@ -108,11 +130,16 @@ function buildPatroller(kind) {
     pan.position.set(0.42, 0.95, 0.25);
     g.add(body, head, hat, pan);
   }
+  const alertGem = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+  alertGem.position.y = 2.25;
+  alertGem.visible = false;
+  g.add(alertGem);
+  g.userData.alertGem = alertGem;
   return shadowed(g);
 }
 
 export function buildMechanicsVisuals(mech, group) {
-  const refs = { switches: [], gates: [], elevators: [], hazards: [], conveyors: [], fans: [] };
+  const refs = { switches: [], gates: [], elevators: [], hazards: [], conveyors: [], fans: [], lowGravs: [], lasers: [] };
   const arrowGeo = makeArrowGeometry();
 
   // --- Pits (dark void + caution border) ---
@@ -216,7 +243,74 @@ export function buildMechanicsVisuals(mech, group) {
         streaks.push(s);
       }
       refs.fans.push({ zone, blades, streaks, streakMat });
+    } else if (zone.type === 'low_gravity') {
+      const padMat = mat(0x22d3ee, {
+        transparent: true,
+        opacity: 0.34,
+        emissive: 0x7c3aed,
+        emissiveIntensity: 0.65,
+        roughness: 0.2
+      });
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(w, 0.03, d), padMat);
+      pad.position.set(cx, baseY + 0.13, cz);
+      pad.receiveShadow = true;
+      group.add(pad);
+
+      const borderMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+      [
+        [cx, zone.minZ, w + 0.14, 0.1], [cx, zone.maxZ, w + 0.14, 0.1],
+        [zone.minX, cz, 0.1, d + 0.14], [zone.maxX, cz, 0.1, d + 0.14]
+      ].forEach(([bx, bz, bw, bd]) => {
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.06, bd), borderMat);
+        edge.position.set(bx, baseY + 0.15, bz);
+        group.add(edge);
+      });
+
+      const moteMat = new THREE.MeshBasicMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.72 });
+      const moteGeo = new THREE.SphereGeometry(0.08, 6, 6);
+      const motes = [];
+      for (let i = 0; i < 10; i++) {
+        const m = new THREE.Mesh(moteGeo, moteMat);
+        m.position.set(
+          zone.minX + 0.25 + Math.random() * Math.max(0.4, w - 0.5),
+          baseY + 0.3 + Math.random() * 2.5,
+          zone.minZ + 0.25 + Math.random() * Math.max(0.4, d - 0.5)
+        );
+        m.userData.sharedGeometry = true;
+        group.add(m);
+        motes.push(m);
+      }
+      refs.lowGravs.push({ zone, motes, baseY, padMat });
     }
+  });
+
+  // --- Laser Security Gates ---
+  (mech.lasers || []).forEach((l) => {
+    const pylonMat = mat(0x1e293b, { metalness: 0.65, roughness: 0.3 });
+    const tipMat = new THREE.MeshBasicMaterial({ color: l.color || 0xff2a6d });
+    [[l.x1, l.z1], [l.x2, l.z2]].forEach(([px, pz]) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.65, 10), pylonMat);
+      post.position.set(px, 0.85, pz);
+      post.castShadow = true;
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), tipMat);
+      tip.position.set(px, 1.72, pz);
+      group.add(post, tip);
+    });
+    const dx = l.x2 - l.x1;
+    const dz = l.z2 - l.z1;
+    const len = Math.max(0.2, Math.hypot(dx, dz));
+    const beamMat = new THREE.MeshBasicMaterial({ color: l.color || 0xff2a6d, transparent: true, opacity: 0.9 });
+    const beamGroup = new THREE.Group();
+    beamGroup.position.set((l.x1 + l.x2) * 0.5, l.y || 0.95, (l.z1 + l.z2) * 0.5);
+    beamGroup.rotation.y = Math.atan2(dx, dz);
+    [-0.28, 0.22].forEach((dy) => {
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, len, 8), beamMat);
+      beam.rotation.x = Math.PI / 2;
+      beam.position.y = dy;
+      beamGroup.add(beam);
+    });
+    group.add(beamGroup);
+    refs.lasers.push({ laser: l, beamGroup, beamMat, tipMat });
   });
 
   // --- Switches ---
@@ -338,6 +432,7 @@ export function buildMechanicsVisuals(mech, group) {
     refs.hazards.push({ hz: h, mesh });
   });
 
+
   let clock = 0;
   const api = {
     update(m, dt) {
@@ -389,6 +484,13 @@ export function buildMechanicsVisuals(mech, group) {
         }
         if (mesh.userData.bob) mesh.position.y = 0.15 + Math.sin(clock * 3 + hz.phase) * 0.12;
         if (mesh.userData.brakeMat) mesh.userData.brakeMat.color.setHex(hz.stopped ? 0xff2222 : 0x7f1d1d);
+        if (mesh.userData.alertGem) {
+          mesh.userData.alertGem.visible = !!hz.alerted && !(hz.stunTimer > 0);
+          if (mesh.userData.alertGem.visible) {
+            mesh.userData.alertGem.rotation.y = clock * 6;
+            mesh.userData.alertGem.position.y = 2.25 + Math.sin(clock * 10) * 0.12;
+          }
+        }
       });
 
       refs.conveyors.forEach((cv) => {
@@ -421,6 +523,35 @@ export function buildMechanicsVisuals(mech, group) {
           if (s.position.z > z.maxZ) s.position.z = z.minZ;
           if (s.position.z < z.minZ) s.position.z = z.maxZ;
         });
+      });
+
+      refs.lowGravs.forEach((lg) => {
+        lg.padMat.emissiveIntensity = 0.5 + Math.sin(clock * 3.5) * 0.2;
+        lg.motes.forEach((pt, idx) => {
+          pt.position.y += dt * (1.1 + (idx % 3) * 0.25);
+          if (pt.position.y > lg.baseY + 3.0) {
+            pt.position.y = lg.baseY + 0.25;
+          }
+        });
+      });
+
+      refs.lasers.forEach(({ laser, beamGroup, beamMat, tipMat }) => {
+        if (laser.state === 'active') {
+          beamGroup.visible = true;
+          beamMat.color.setHex(laser.color || 0xff2a6d);
+          beamMat.opacity = 0.85 + Math.sin(clock * 28) * 0.15;
+          beamGroup.scale.set(1, 1, 1);
+          tipMat.color.setHex(laser.color || 0xff2a6d);
+        } else if (laser.state === 'warning') {
+          beamGroup.visible = Math.sin(clock * 26) > 0;
+          beamMat.color.setHex(0xfacc15);
+          beamMat.opacity = 0.45;
+          beamGroup.scale.set(0.45, 0.45, 1);
+          tipMat.color.setHex(0xfacc15);
+        } else {
+          beamGroup.visible = false;
+          tipMat.color.setHex(0x22c55e);
+        }
       });
     }
   };

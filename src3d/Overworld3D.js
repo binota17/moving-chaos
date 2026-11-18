@@ -21,7 +21,12 @@ const PAD_SPOTS = [
   { id: 9, x: 18.5, z: -5.5, bx: 22.4, bz: -6.2, color: 0x6366f1, chapter: 3 },
   { id: 10, x: 19.0, z: 1.0, bx: 23.0, bz: 1.0, color: 0x0ea5e9, chapter: 3 },
   { id: 11, x: 18.5, z: 7.5, bx: 22.4, bz: 8.0, color: 0xea580c, chapter: 3 },
-  { id: 12, x: 11.0, z: 11.2, bx: 11.0, bz: 15.0, color: 0xf43f5e, chapter: 3 }
+  { id: 12, x: 11.0, z: 11.2, bx: 11.0, bz: 15.0, color: 0xf43f5e, chapter: 3 },
+  // Chapter 4: Quantum Lab & Orbital Spaceport (North Wing)
+  { id: 13, x: -12.0, z: -13.5, bx: -15.8, bz: -15.2, color: 0x06b6d4, chapter: 4 },
+  { id: 14, x: -2.0, z: -13.5, bx: -2.0, bz: -17.4, color: 0xa855f7, chapter: 4 },
+  { id: 15, x: 6.5, z: -13.5, bx: 6.5, bz: -17.4, color: 0x22d3ee, chapter: 4 },
+  { id: 16, x: 15.5, z: -13.5, bx: 19.5, bz: -15.2, color: 0xf43f5e, chapter: 4 }
 ];
 
 function createPadTexture(num, stars, accentHex) {
@@ -96,6 +101,18 @@ function createMiniLandmark(spot) {
     cap.position.y = h + 0.14;
     cap.castShadow = true;
     g.add(cap);
+  } else if (spot.chapter === 4) {
+    // Sci-Fi Quantum Lab / Orbital Dish Landmark
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(Math.max(w, d) * 0.44, 0.14, 8, 22),
+      new THREE.MeshBasicMaterial({ color: 0x22d3ee })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = h + 0.16;
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.5, 8), roofMat);
+    spire.position.y = h + 0.78;
+    spire.castShadow = true;
+    g.add(ring, spire);
   } else {
     // VIP Dome / Mast / Harbour Crane silhouette
     const cap = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.26, d + 0.3), trimMat);
@@ -188,37 +205,46 @@ export class Overworld3D {
   }
 
   build() {
-    // 1. Wide Sunny Island Ground
+    // 1. Wide Sunny Island Ground + North Sci-Fi Spaceport Platform (Chapter 4)
     const ground = new THREE.Mesh(
-      new THREE.BoxGeometry(58, 1.2, 38),
+      new THREE.BoxGeometry(58, 1.2, 46),
       new THREE.MeshStandardMaterial({ color: 0x77c956, roughness: 0.9 })
     );
-    ground.position.set(2, -0.62, 1);
+    ground.position.set(2, -0.62, -2);
     ground.receiveShadow = true;
     this.group.add(ground);
 
+    const sciFiDeck = new THREE.Mesh(
+      new THREE.BoxGeometry(44, 0.14, 11.5),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.35 })
+    );
+    sciFiDeck.position.set(2, -0.02, -15.5);
+    sciFiDeck.receiveShadow = true;
+    this.group.add(sciFiDeck);
+
     // Chapter Harbor Water Strip on East Coast (for levels 10 & 11)
     const water = new THREE.Mesh(
-      new THREE.BoxGeometry(10, 0.4, 38),
+      new THREE.BoxGeometry(10, 0.4, 46),
       new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.1 })
     );
-    water.position.set(27.5, -0.26, 1);
+    water.position.set(27.5, -0.26, -2);
     this.group.add(water);
 
-    // 2. Clean Paved Road Network connecting all 12 pads
+    // 2. Clean Paved Road Network connecting all 16 pads
     const roadMat = new THREE.MeshStandardMaterial({ color: 0x526071, roughness: 0.88 });
     const stripeMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.6 });
     const roadSegs = [
-      // Main East-West avenue
+      // Main East-West avenue + North Chapter 4 orbital boulevard
       { x: 1.5, z: 7.5, w: 38, d: 3.2 },
       { x: 3.5, z: -6.5, w: 33, d: 3.0 },
       { x: 0.5, z: 1.0, w: 28, d: 2.8 },
+      { x: 2.0, z: -13.5, w: 33, d: 2.8 },
       // North-South connectors
-      { x: -12.0, z: 1.5, w: 3.0, d: 16.0 },
-      { x: -2.0, z: 1.0, w: 3.0, d: 15.0 },
-      { x: 5.5, z: 0.5, w: 3.0, d: 17.5 },
+      { x: -12.0, z: -3.5, w: 3.0, d: 24.0 },
+      { x: -2.0, z: -3.5, w: 3.0, d: 23.0 },
+      { x: 5.5, z: -3.0, w: 3.0, d: 24.0 },
       { x: 12.5, z: 1.5, w: 3.2, d: 22.0 },
-      { x: 18.8, z: 1.0, w: 3.2, d: 16.5 }
+      { x: 18.8, z: -2.5, w: 3.2, d: 23.5 }
     ];
     roadSegs.forEach((r) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(r.w, 0.08, r.d), roadMat);
@@ -320,7 +346,7 @@ export class Overworld3D {
     this.truckVx = THREE.MathUtils.lerp(this.truckVx, targetVx, Math.min(1, dt * 8));
     this.truckVz = THREE.MathUtils.lerp(this.truckVz, targetVz, Math.min(1, dt * 8));
     this.truckX = THREE.MathUtils.clamp(this.truckX + this.truckVx * dt, -22, 21.5);
-    this.truckZ = THREE.MathUtils.clamp(this.truckZ + this.truckVz * dt, -14, 15.5);
+    this.truckZ = THREE.MathUtils.clamp(this.truckZ + this.truckVz * dt, -19.5, 15.5);
 
     const spd = Math.hypot(this.truckVx, this.truckVz);
     if (this.truck) {

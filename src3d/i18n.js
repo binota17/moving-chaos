@@ -52,6 +52,22 @@ const LEVEL_I18N = {
   12: {
     vi: { chapter: 'Chương 3 • Chuyến Hàng VIP', name: '💎 12. Biệt Thự Tỷ Phú', shortDesc: '16 món • Chặng cuối: Giao thông, Robot, Sàn trơn & Hầm vàng.', bonusLabel: 'Hoàn hảo tuyệt đối chặng cuối' },
     en: { chapter: 'Ch.3 • VIP Contracts', name: '💎 12. Billionaire Estate', shortDesc: '16 items • Grand finale: Traffic, Bots, Ice & Vault.', bonusLabel: 'Flawless finale delivery' }
+  },
+  13: {
+    vi: { chapter: 'Chương 4 • Phòng Lab & Không Gian', name: '🧪 13. Phòng Thí Nghiệm Đổi Trọng', shortDesc: '13 món • Vùng trọng lực thấp bay bổng, Tia Laser & Bảo vệ đuổi bắt.', bonusLabel: 'Không vỡ món đồ thí nghiệm nào' },
+    en: { chapter: 'Ch.4 • Sci-Fi Lab & Space', name: '🧪 13. Zero-G Bio-Lab', shortDesc: '13 items • Low-gravity float zone, Laser gate & Chasing Guard.', bonusLabel: 'Keep all fragile lab gear safe' }
+  },
+  14: {
+    vi: { chapter: 'Chương 4 • Phòng Lab & Không Gian', name: '🖥️ 14. Trạm Server Lượng Tử', shortDesc: '14 món • Tầng lửng Server, 2 Hàng Laser đảo pha & Drone tuần tra.', bonusLabel: 'Không va chạm Drone hay Laser' },
+    en: { chapter: 'Ch.4 • Sci-Fi Lab & Space', name: '🖥️ 14. Quantum Data Center', shortDesc: '14 items • Twin Laser grid, Server lift, Bridge & Hover Drone.', bonusLabel: 'Zero Drone or Laser hits' }
+  },
+  15: {
+    vi: { chapter: 'Chương 4 • Phòng Lab & Không Gian', name: '🎬 15. Phim Trường Sci-Fi Hollywood', shortDesc: '15 món • Sân khấu Mặt Trăng nhẹ bẫng, Xe đóng thế, Laser & Đạo cụ.', bonusLabel: 'Không làm vỡ cửa kính trường quay' },
+    en: { chapter: 'Ch.4 • Sci-Fi Lab & Space', name: '🎬 15. Sci-Fi Film Studio', shortDesc: '15 items • Lunar Low-G stage, Stunt traffic, Laser & Props.', bonusLabel: 'Keep studio glass intact' }
+  },
+  16: {
+    vi: { chapter: 'Chương 4 • Phòng Lab & Không Gian', name: '🚀 16. Trạm Không Gian Apex', shortDesc: '16 món • Đại kết cục: Không trọng lực, 2 Laser, Drone & Bảo vệ đuổi!', bonusLabel: 'Hoàn hảo tuyệt đối ngoài quỹ đạo' },
+    en: { chapter: 'Ch.4 • Sci-Fi Lab & Space', name: '🚀 16. Apex Orbital Station', shortDesc: '16 items • Grand orbital finale: Zero-G, Dual Lasers, Drone & Guard.', bonusLabel: 'Flawless orbital contract' }
   }
 };
 
@@ -62,13 +78,13 @@ const DICT = {
     logo_sub: '',
     sec_character_mode: '',
     sec_levels: '',
-    open_map_select_btn: '🗺️ Danh sách 12 Map',
+    open_map_select_btn: '🗺️ Danh sách 16 Map',
     overworld_btn: '🚐 Lái xe chọn Map',
     overworld_launch_btn: '🚚 NHẬN HỢP ĐỒNG',
     overworld_back_btn: '🏠 Menu',
-    overworld_roam_hint: 'Lái xe [WASD / Mũi tên] tới ô số 1–12 trên bản đồ!',
+    overworld_roam_hint: 'Lái xe [WASD / Mũi tên] tới ô số 1–16 trên bản đồ!',
     overworld_park_hint: 'Nhấn [Space / J / Enter] để nhận hợp đồng ngay!',
-    map_select_modal_title: 'CHỌN BẢN ĐỒ (12 MÀN • 3 CHƯƠNG)',
+    map_select_modal_title: 'CHỌN BẢN ĐỒ (16 MÀN • 4 CHƯƠNG)',
     variant_base_title: 'Bobi',
     variant_base_desc: '',
     variant_base_perk: '+12% Tốc & Ném',
@@ -109,9 +125,11 @@ const DICT = {
     touch_jump: '🦘 NHẢY',
     touch_grab: '📦 NHẶT',
     touch_throw: '🚀 NÉM',
-    ctrl_single_hud: '<span class="kbd">WASD</span> Đi · <span class="kbd">Space</span> Nhảy · <span class="kbd">F</span> Lướt · <span class="kbd">J</span> Nhặt · <span class="kbd">K</span>/Chuột Ném · <span class="kbd">G</span> Cảm xúc · <span class="kbd">Q/R</span> Xoay',
-    ctrl_p1_hud: '<b>P1:</b> <span class="kbd">WASD</span> <span class="kbd">Space</span> <span class="kbd">F</span> <span class="kbd">C</span> <span class="kbd">V</span>',
-    ctrl_p2_hud: '<b>P2:</b> <span class="kbd">Mũi tên</span> <span class="kbd">Enter</span> <span class="kbd">/</span> <span class="kbd">K</span> <span class="kbd">L</span> · <b>P3/P4:</b> 🎮 Tay cầm',
+    touch_slap: '👋 TÁT',
+    touch_ping: '📍 PING',
+    ctrl_single_hud: '<span class="kbd">WASD</span> Đi · <span class="kbd">Space</span> Nhảy · <span class="kbd">F</span> Lướt · <span class="kbd">J</span> Nhặt · <span class="kbd">K</span>/Chuột Ném · <span class="kbd">E</span> Tát · <span class="kbd">T</span> Ping · <span class="kbd">Q/R</span> Xoay',
+    ctrl_p1_hud: '<b>P1:</b> <span class="kbd">WASD</span> <span class="kbd">Space</span> <span class="kbd">F</span> <span class="kbd">C</span> <span class="kbd">V</span> <span class="kbd">E</span> <span class="kbd">T</span>',
+    ctrl_p2_hud: '<b>P2:</b> <span class="kbd">Mũi tên</span> <span class="kbd">Enter</span> <span class="kbd">/</span> <span class="kbd">K</span> <span class="kbd">L</span> <span class="kbd">.</span> <span class="kbd">\'</span> · <b>P3/P4:</b> 🎮',
     carry_only_hint: '🏋️ Đồ nặng — Phải khiêng bộ qua cửa!',
     carry_only_badge: '🏋️ Khiêng bộ',
     throwable_badge: '🚀 Ném được',
@@ -131,8 +149,10 @@ const DICT = {
     settings_title: 'CÀI ĐẶT',
     pause_lan_note: 'LAN đang bật — trận đấu vẫn chạy đồng bộ.',
     set_language: 'Ngôn ngữ',
+    set_master_vol: 'Âm lượng tổng',
     set_bgm_vol: 'Nhạc nền',
     set_sfx_vol: 'Âm thanh',
+    audio_mixer_title: 'ÂM THANH',
     set_graphics: 'Đồ họa',
     set_gfx_high: 'Cao (Bóng đổ)',
     set_gfx_smooth: 'Mượt 60FPS',
@@ -176,18 +196,28 @@ const DICT = {
     mech_traffic_green: 'ĐÈN XANH!',
     mech_pit_fall: 'LỌT HỐ!',
     mech_hazard_hit: 'VA CHẠM!',
+    mech_laser_zap: '⚡ DÍNH LASER!',
+    mech_guard_alert: '❗ BỊ PHÁT HIỆN!',
+    mech_pack_neat: '✨ XẾP GỌN!',
+    mech_pack_crowded: '📦 ĐẦY GÓC! NÉM CHỖ TRỐNG!',
+    mech_slap_mate: '👋 BẠP!',
+    mech_slap_guard: '💫 CHOÁNG LUÔN!',
+    ping_help_carry: '🆘 Phụ khiêng!',
+    ping_switch: '🕹️ Gạt công tắc!',
+    ping_truck: '🚚 Vứt vô đây!',
+    ping_gather: '📍 Tập trung!',
     mech_item_respawn: 'RỚT ĐỒ!',
     controls_btn: '📖',
     controls_modal_title: 'HƯỚNG DẪN CHƠI',
     controls_quick_hint: '',
     guide_full_html: `
-      <p>🎯 <b>Mục tiêu &amp; Phân loại đồ:</b> Đồ <b>vòng đơn</b> (thùng, TV, thú cưng...) <b>ném xa</b> qua hàng rào/bạt lò xo được. Đồ <b>vòng cam kép 🏋️</b> (Sofa, Giường, Tủ lạnh, Piano, Két...) <b>không thể ném</b> — phải <b>khiêng bộ qua cửa</b> (chú ý xoay hướng khi đi qua cửa hẹp!).</p>
-      <p>⚡ <b>Nhân vật &amp; Chế độ 1–4 Người:</b> Hỗ trợ <b>1P, 2P chia phím, 3P &amp; 4P bằng tay cầm</b>. <b>Bobi</b> (+12% chạy &amp; ném) · <b>Công Nhân</b> (vác nặng khỏe) · <b>Đầu Bếp</b> (bám sàn trơn, đỡ vỡ).</p>
-      <p>🚐 <b>Bản đồ 3D &amp; Mở khóa Sao:</b> Lái xe tải chọn 12 hợp đồng qua 3 chương; tích lũy ★ mở khóa màu Bobi mới!</p>
+      <p>🎯 <b>Mục tiêu &amp; Phân loại đồ:</b> Đồ <b>vòng đơn</b> <b>ném xa</b> qua hàng rào/bạt lò xo có <b>đường ngắm parabol</b>. Đồ <b>vòng cam kép 🏋️</b> (Sofa, Giường, Két, Khoang đông...) <b>không thể ném</b> — phải <b>khiêng bộ qua cửa</b>!</p>
+      <p>👋 <b>Tát nhẹ &amp; Ping nhanh:</b> Nhấn <span class="kbd">E</span> để <b>tát đẩy đồng đội</b> hoặc <b>choáng Bảo vệ / Drone</b>! Nhấn <span class="kbd">T</span> / Chuột giữa để bắn <b>tín hiệu Ping 3D</b> kêu gọi bạn phụ khiêng hoặc gạt công tắc!</p>
+      <p>📦 <b>Xếp thùng xe &amp; 16 Hợp đồng:</b> Căn đồ gọn gàng vào ô trống trong thùng xe để ăn thưởng <b>✨ Xếp gọn</b>! Khám phá <b>16 màn qua 4 chương</b> gồm cả <b>Phòng Thí Nghiệm &amp; Trạm Không Gian</b> với vùng trọng lực thấp &amp; tia laser!</p>
       <hr style="border:none;border-top:1px solid rgba(30,36,44,0.12);margin:10px 0;">
-      <p>👤 <b>1 Người:</b> <span class="kbd">WASD</span> đi · <span class="kbd">Space</span> nhảy · <span class="kbd">F</span> lướt · <span class="kbd">J</span> nhặt · <span class="kbd">K</span> / Chuột ném · <span class="kbd">G</span> biểu cảm · <span class="kbd">Q/R</span> xoay</p>
-      <p>🎮 <b>Tay cầm (tối đa 4 tay):</b> Stick trái đi · <span class="kbd">A</span> nhảy · <span class="kbd">X</span> nhặt · <span class="kbd">B/RT</span> ném / lướt · Stick phải xoay</p>
-      <p>👥 <b>2–4 Người:</b> <b>P1:</b> <span class="kbd">WASD</span> <span class="kbd">Space</span> <span class="kbd">F</span> <span class="kbd">C</span> <span class="kbd">V</span> · <b>P2:</b> <span class="kbd">Mũi tên</span> <span class="kbd">Enter</span> <span class="kbd">/</span> <span class="kbd">K</span> <span class="kbd">L</span> · <b>P3/P4:</b> Tay cầm 3 &amp; 4</p>
+      <p>👤 <b>1 Người:</b> <span class="kbd">WASD</span> đi · <span class="kbd">Space</span> nhảy · <span class="kbd">F</span> lướt · <span class="kbd">J</span> nhặt · <span class="kbd">K</span>/Chuột ném · <span class="kbd">E</span> tát · <span class="kbd">T</span>/Chuột giữa ping · <span class="kbd">G</span> cảm xúc · <span class="kbd">Q/R</span> xoay</p>
+      <p>🎮 <b>Tay cầm (tối đa 4 tay):</b> Stick trái đi · <span class="kbd">A</span> nhảy · <span class="kbd">X</span> nhặt · <span class="kbd">Y</span> tát · <span class="kbd">B/RT</span> ném / lướt · <span class="kbd">Select</span> ping · Stick phải xoay</p>
+      <p>👥 <b>2–4 Người:</b> <b>P1:</b> <span class="kbd">WASD</span> <span class="kbd">Space</span> <span class="kbd">F</span> <span class="kbd">C</span> <span class="kbd">V</span> <span class="kbd">E</span> <span class="kbd">T</span> · <b>P2:</b> <span class="kbd">Mũi tên</span> <span class="kbd">Enter</span> <span class="kbd">/</span> <span class="kbd">K</span> <span class="kbd">L</span> <span class="kbd">.</span> <span class="kbd">'</span> · <b>P3/P4:</b> Tay cầm 3 &amp; 4</p>
     `,
     spotlight_tag: 'MÀN {id}',
     spotlight_items: '{count} món',
@@ -202,13 +232,13 @@ const DICT = {
     logo_sub: '',
     sec_character_mode: '',
     sec_levels: '',
-    open_map_select_btn: '🗺️ All 12 Maps',
+    open_map_select_btn: '🗺️ All 16 Maps',
     overworld_btn: '🚐 Drive Town Map',
     overworld_launch_btn: '🚚 ACCEPT CONTRACT',
     overworld_back_btn: '🏠 Menu',
-    overworld_roam_hint: 'Drive [WASD / Arrows] onto pads 1–12 across the town!',
+    overworld_roam_hint: 'Drive [WASD / Arrows] onto pads 1–16 across the town!',
     overworld_park_hint: 'Press [Space / J / Enter] to start this contract!',
-    map_select_modal_title: 'SELECT MAP (12 CONTRACTS • 3 CHAPTERS)',
+    map_select_modal_title: 'SELECT MAP (16 CONTRACTS • 4 CHAPTERS)',
     variant_base_title: 'Bobi',
     variant_base_desc: '',
     variant_base_perk: '+12% Speed & Throw',
@@ -249,9 +279,11 @@ const DICT = {
     touch_jump: '🦘 JUMP',
     touch_grab: '📦 GRAB',
     touch_throw: '🚀 THROW',
-    ctrl_single_hud: '<span class="kbd">WASD</span> Move · <span class="kbd">Space</span> Jump · <span class="kbd">F</span> Dash · <span class="kbd">J</span> Grab · <span class="kbd">K</span>/Mouse Throw · <span class="kbd">G</span> Emote · <span class="kbd">Q/R</span> Orbit',
-    ctrl_p1_hud: '<b>P1:</b> <span class="kbd">WASD</span> <span class="kbd">Space</span> <span class="kbd">F</span> <span class="kbd">C</span> <span class="kbd">V</span>',
-    ctrl_p2_hud: '<b>P2:</b> <span class="kbd">Arrows</span> <span class="kbd">Enter</span> <span class="kbd">/</span> <span class="kbd">K</span> <span class="kbd">L</span> · <b>P3/P4:</b> 🎮 Pads',
+    touch_slap: '👋 SLAP',
+    touch_ping: '📍 PING',
+    ctrl_single_hud: '<span class="kbd">WASD</span> Move · <span class="kbd">Space</span> Jump · <span class="kbd">F</span> Dash · <span class="kbd">J</span> Grab · <span class="kbd">K</span>/Mouse Throw · <span class="kbd">E</span> Slap · <span class="kbd">T</span> Ping · <span class="kbd">Q/R</span> Orbit',
+    ctrl_p1_hud: '<b>P1:</b> <span class="kbd">WASD</span> <span class="kbd">Space</span> <span class="kbd">F</span> <span class="kbd">C</span> <span class="kbd">V</span> <span class="kbd">E</span> <span class="kbd">T</span>',
+    ctrl_p2_hud: '<b>P2:</b> <span class="kbd">Arrows</span> <span class="kbd">Enter</span> <span class="kbd">/</span> <span class="kbd">K</span> <span class="kbd">L</span> <span class="kbd">.</span> <span class="kbd">\'</span> · <b>P3/P4:</b> 🎮',
     carry_only_hint: '🏋️ Heavy Cargo — Carry through doorways!',
     carry_only_badge: '🏋️ Carry Only',
     throwable_badge: '🚀 Throwable',
@@ -271,8 +303,10 @@ const DICT = {
     settings_title: 'SETTINGS',
     pause_lan_note: 'LAN Co-op active — match stays live.',
     set_language: 'Language',
+    set_master_vol: 'Master',
     set_bgm_vol: 'Music',
     set_sfx_vol: 'SFX',
+    audio_mixer_title: 'AUDIO',
     set_graphics: 'Graphics',
     set_gfx_high: 'High (Shadows)',
     set_gfx_smooth: 'Smooth 60FPS',
@@ -316,18 +350,28 @@ const DICT = {
     mech_traffic_green: 'GREEN LIGHT!',
     mech_pit_fall: 'PIT FALL!',
     mech_hazard_hit: 'BONK!',
+    mech_laser_zap: '⚡ LASER ZAP!',
+    mech_guard_alert: '❗ SPOTTED!',
+    mech_pack_neat: '✨ NEAT PACK!',
+    mech_pack_crowded: '📦 FULL CORNER! AIM OPEN BAY!',
+    mech_slap_mate: '👋 SLAP!',
+    mech_slap_guard: '💫 STUNNED!',
+    ping_help_carry: '🆘 Help carry!',
+    ping_switch: '🕹️ Hit switch!',
+    ping_truck: '🚚 Load here!',
+    ping_gather: '📍 Over here!',
     mech_item_respawn: 'DROPPED!',
     controls_btn: '📖',
     controls_modal_title: 'HOW TO PLAY',
     controls_quick_hint: '',
     guide_full_html: `
-      <p>🎯 <b>Throwable vs Carry-Only:</b> Regular items can be <b>hurled</b> over fences &amp; trampolines. Heavy furniture with <b>double orange rings 🏋️</b> (Sofas, Beds, Fridges, Pianos, Safes) are <b>Carry-Only</b> — rotate &amp; carry them cleanly through doorways!</p>
-      <p>⚡ <b>1–4 Players &amp; Crew Perks:</b> Supports <b>1P, 2P split-keyboard, and 3P–4P with gamepads</b>. <b>Bobi</b> (+12% speed &amp; throw) · <b>Builder</b> (stronger heavy carry) · <b>Chef</b> (anti-slip &amp; safer fragile throws).</p>
-      <p>🚐 <b>3D Overworld &amp; Star Unlocks:</b> Drive the truck to pick any of the 12 contracts across 3 chapters and unlock Bobi tints with stars!</p>
+      <p>🎯 <b>Throwable vs Carry-Only:</b> Regular items show a live <b>parabolic aim arc</b> and can be <b>hurled</b> over fences &amp; trampolines. Heavy cargo with <b>double orange rings 🏋️</b> (Sofas, Beds, Safes, Cryo Pods) are <b>Carry-Only</b> — guide them cleanly through doorways!</p>
+      <p>👋 <b>Playful Slap &amp; Quick Ping:</b> Press <span class="kbd">E</span> to <b>slap/nudge</b> teammates or stun chasing <b>Guards &amp; Drones</b>! Press <span class="kbd">T</span> / Middle Click to drop a <b>3D Ping Beacon</b> for co-op callouts!</p>
+      <p>📦 <b>Spatial Truck Packing &amp; 16 Contracts:</b> Aim throws into open truck bays to earn <b>✨ Neat Pack</b> bonuses! Conquer <b>16 maps across 4 chapters</b>, including <b>Zero-G Labs &amp; Orbital Stations</b>!</p>
       <hr style="border:none;border-top:1px solid rgba(30,36,44,0.12);margin:10px 0;">
-      <p>👤 <b>Solo:</b> <span class="kbd">WASD</span> move · <span class="kbd">Space</span> jump · <span class="kbd">F</span> dash · <span class="kbd">J</span> grab · <span class="kbd">K</span> / Mouse throw · <span class="kbd">G</span> emote · <span class="kbd">Q/R</span> orbit</p>
-      <p>🎮 <b>Gamepads (up to 4):</b> Left Stick move · <span class="kbd">A</span> jump · <span class="kbd">X</span> grab · <span class="kbd">B/RT</span> throw/dash · Right Stick orbit</p>
-      <p>👥 <b>2–4P:</b> <b>P1:</b> <span class="kbd">WASD</span> <span class="kbd">Space</span> <span class="kbd">F</span> <span class="kbd">C</span> <span class="kbd">V</span> · <b>P2:</b> <span class="kbd">Arrows</span> <span class="kbd">Enter</span> <span class="kbd">/</span> <span class="kbd">K</span> <span class="kbd">L</span> · <b>P3/P4:</b> Gamepads 3 &amp; 4</p>
+      <p>👤 <b>Solo:</b> <span class="kbd">WASD</span> move · <span class="kbd">Space</span> jump · <span class="kbd">F</span> dash · <span class="kbd">J</span> grab · <span class="kbd">K</span>/Mouse throw · <span class="kbd">E</span> slap · <span class="kbd">T</span>/Mid-Click ping · <span class="kbd">G</span> emote · <span class="kbd">Q/R</span> orbit</p>
+      <p>🎮 <b>Gamepads (up to 4):</b> Left Stick move · <span class="kbd">A</span> jump · <span class="kbd">X</span> grab · <span class="kbd">Y</span> slap · <span class="kbd">B/RT</span> throw/dash · <span class="kbd">Select</span> ping · Right Stick orbit</p>
+      <p>👥 <b>2–4P:</b> <b>P1:</b> <span class="kbd">WASD</span> <span class="kbd">Space</span> <span class="kbd">F</span> <span class="kbd">C</span> <span class="kbd">V</span> <span class="kbd">E</span> <span class="kbd">T</span> · <b>P2:</b> <span class="kbd">Arrows</span> <span class="kbd">Enter</span> <span class="kbd">/</span> <span class="kbd">K</span> <span class="kbd">L</span> <span class="kbd">.</span> <span class="kbd">'</span> · <b>P3/P4:</b> Gamepads 3 &amp; 4</p>
     `,
     spotlight_tag: 'MAP {id}',
     spotlight_items: '{count} items',

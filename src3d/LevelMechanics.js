@@ -65,6 +65,16 @@ export class LevelMechanics {
 
     this.zones = (def.zones || []).map((z) => ({ y: 0, ...z }));
     this.pits = (def.pits || []).map((p) => ({ ...p }));
+    this.lasers = (def.lasers || []).map((l) => ({
+      y: 0.95,
+      period: 4.2,
+      activeWindow: 1.65,
+      warnWindow: 0.7,
+      phase: 0,
+      color: 0xff2a6d,
+      ...l,
+      state: 'off'
+    }));
 
     this.elevators = (def.elevators || []).map((e) => {
       const el = { yMin: 0, yMax: 2.4, speed: 1.2, pauseSec: 1.5, offset: 0, ...e };
@@ -85,6 +95,8 @@ export class LevelMechanics {
       hz.hornCd = 0;
       hz.stopped = false;
       hz.stunTimer = 0;
+      hz.alerted = false;
+      hz.chasing = false;
       if (hz.type === 'car') {
         hz._period = Math.max(1, hz.to - hz.from);
       } else {
@@ -106,6 +118,7 @@ export class LevelMechanics {
 
     this._computeElevators();
     this._computeHazards();
+    this._computeLasers();
   }
 
   // ---------------------------------------------------------------------
@@ -165,8 +178,9 @@ export class LevelMechanics {
   // Simulation tick
   // ---------------------------------------------------------------------
   update(dt, ctx = {}) {
-    const { authoritative = true, players = [], items = [] } = ctx;
+    const { authoritative = true, players = [], items = [], landlordRage = 0 } = ctx;
     const changed = [];
+    const alerts = [];
     this.time += dt;
 
     for (const s of this.switches) {
@@ -204,14 +218,72 @@ export class LevelMechanics {
     for (const e of this.elevators) e.phase = (e.phase + dt) % e._period;
     this._computeElevators();
 
+    this._computeLasers();
+
     for (const h of this.hazards) {
       if (h.stunTimer > 0) h.stunTimer = Math.max(0, h.stunTimer - dt);
       h.stopped = !!(h.stopSwitchId && this.isSwitchActive(h.stopSwitchId));
-      if (!h.stopped && !(h.stunTimer > 0)) h.phase = (h.phase + h.speed * dt) % h._period;
       if (h.hornCd > 0) h.hornCd -= dt;
+
+      // Reactive chaser behavior for guards/drones when players get close or landlord rage spikes
+      if (authoritative && h.type !== 'car' && h.chaseRange > 0 && !h.stopped && h.stunTimer <= 0) {
+        const enraged = landlordRage >= (h.chaseRageTrigger ?? 999);
+        const effRange = enraged ? h.chaseRange * 1.55 : h.chaseRange;
+        let targetP = null;
+        let bestD = effRange;
+        for (const p of players) {
+          if (!p || p.stunTimer > 0 || p.y > 1.8) continue;
+          const d = Math.hypot(p.x - h.x, p.z - h.z);
+          if (d < bestD && (!h.leashBounds || inRect(h.leashBounds, p.x, p.z))) {
+            bestD = d;
+            targetP = p;
+          }
+        }
+        if (targetP) {
+          if (!h.alerted) alerts.push(h);
+          h.alerted = true;
+          h.chasing = true;
+          const dx = targetP.x - h.x;
+          const dz = targetP.z - h.z;
+          const dist = Math.hypot(dx, dz) || 1;
+          const spd = (h.chaseSpeed || (h.speed * 1.32)) * (enraged ? 1.12 : 1.0);
+          h.x += (dx / dist) * spd * dt;
+          h.z += (dz / dist) * spd * dt;
+          if (h.leashBounds) {
+            h.x = Math.max(h.leashBounds.minX, Math.min(h.leashBounds.maxX, h.x));
+            h.z = Math.max(h.leashBounds.minZ, Math.min(h.leashBounds.maxZ, h.z));
+          }
+          h.rotY = Math.atan2(dx, dz);
+          continue;
+        }
+      }
+
+      if (h.chasing && (!authoritative || h.stunTimer > 0 || h.stopped)) {
+        h.alerted = false;
+        h.chasing = false;
+      } else if (h.chasing) {
+        // Target escaped range -> smoothly walk back to patrol anchor
+        h.alerted = false;
+        const anchor = this._samplePatrolPos(h);
+        const dx = anchor.x - h.x;
+        const dz = anchor.z - h.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist < 0.28) {
+          h.chasing = false;
+        } else {
+          const retSpd = h.speed * 1.1;
+          h.x += (dx / dist) * Math.min(dist, retSpd * dt);
+          h.z += (dz / dist) * Math.min(dist, retSpd * dt);
+          h.rotY = Math.atan2(dx, dz);
+          continue;
+        }
+      }
+
+      if (!h.stopped && !(h.stunTimer > 0)) h.phase = (h.phase + h.speed * dt) % h._period;
     }
     this._computeHazards();
 
+    this.lastAlerts = alerts;
     return changed;
   }
 
@@ -232,8 +304,56 @@ export class LevelMechanics {
     }
   }
 
+  _computeLasers() {
+    for (const l of this.lasers) {
+      if (l.switchId) {
+        const active = this.isSwitchActive(l.switchId);
+        const disabled = l.invert ? !active : active;
+        if (disabled) {
+          l.state = 'off';
+          continue;
+        }
+      }
+      if (l.alwaysOn) {
+        l.state = 'active';
+        continue;
+      }
+      const period = Math.max(1.2, l.period || 4.0);
+      const cycle = ((this.time + (l.phase || 0)) % period + period) % period;
+      if (cycle < (l.activeWindow || 1.6)) l.state = 'active';
+      else if (cycle > period - (l.warnWindow || 0.7)) l.state = 'warning';
+      else l.state = 'off';
+    }
+  }
+
+  _samplePatrolPos(h) {
+    const s = ((h.phase % h._period) + h._period) % h._period;
+    let dist = s;
+    let forward = true;
+    if (!h.loop && dist > h._pathLen) {
+      dist = h._period - dist;
+      forward = false;
+    }
+    let acc = 0;
+    for (const seg of h._segs) {
+      if (dist <= acc + seg.len || seg === h._segs[h._segs.length - 1]) {
+        const t = Math.max(0, Math.min(1, (dist - acc) / seg.len));
+        const dx = (seg.b[0] - seg.a[0]) * (forward ? 1 : -1);
+        const dz = (seg.b[1] - seg.a[1]) * (forward ? 1 : -1);
+        return {
+          x: seg.a[0] + (seg.b[0] - seg.a[0]) * t,
+          z: seg.a[1] + (seg.b[1] - seg.a[1]) * t,
+          rotY: Math.atan2(dx, dz)
+        };
+      }
+      acc += seg.len;
+    }
+    return { x: h.x, z: h.z, rotY: h.rotY };
+  }
+
   _computeHazards() {
     for (const h of this.hazards) {
+      if (h.chasing) continue;
       const s = ((h.phase % h._period) + h._period) % h._period;
       if (h.type === 'car') {
         const along = h.dir >= 0 ? h.from + s : h.to - s;
@@ -249,26 +369,10 @@ export class LevelMechanics {
         continue;
       }
 
-      // Polyline patrol (loop or ping-pong)
-      let dist = s;
-      let forward = true;
-      if (!h.loop && dist > h._pathLen) {
-        dist = h._period - dist;
-        forward = false;
-      }
-      let acc = 0;
-      for (const seg of h._segs) {
-        if (dist <= acc + seg.len || seg === h._segs[h._segs.length - 1]) {
-          const t = Math.max(0, Math.min(1, (dist - acc) / seg.len));
-          h.x = seg.a[0] + (seg.b[0] - seg.a[0]) * t;
-          h.z = seg.a[1] + (seg.b[1] - seg.a[1]) * t;
-          const dx = (seg.b[0] - seg.a[0]) * (forward ? 1 : -1);
-          const dz = (seg.b[1] - seg.a[1]) * (forward ? 1 : -1);
-          h.rotY = Math.atan2(dx, dz);
-          break;
-        }
-        acc += seg.len;
-      }
+      const pt = this._samplePatrolPos(h);
+      h.x = pt.x;
+      h.z = pt.z;
+      h.rotY = pt.rotY;
     }
   }
 
@@ -367,6 +471,36 @@ export class LevelMechanics {
     return { fx, fz };
   }
 
+  /** Returns active gravity multiplier (e.g., 0.42 inside low_gravity zones, else 1.0). */
+  gravityScaleAt(x, z, y = 0) {
+    let scale = 1.0;
+    for (const zone of this.zones) {
+      if (zone.type !== 'low_gravity' || !inRect(zone, x, z)) continue;
+      if (y < (zone.yMin ?? -1.5) || y > (zone.yMax ?? 7.5)) continue;
+      if (zone.switchId && this.isSwitchActive(zone.switchId) && zone.offWhenActive) continue;
+      scale = Math.min(scale, zone.gravityScale ?? 0.42);
+    }
+    return scale;
+  }
+
+  /** Returns active laser beam intersecting an entity, or null. */
+  laserHitting(entity, radius = 0.36) {
+    if (!entity || this.lasers.length === 0) return null;
+    for (const l of this.lasers) {
+      if (l.state !== 'active') continue;
+      if ((entity.y || 0) > (l.y || 0.95) + 0.95 || (entity.y || 0) < (l.y || 0.95) - 1.1) continue;
+      const vx = l.x2 - l.x1;
+      const vz = l.z2 - l.z1;
+      const lenSq = vx * vx + vz * vz;
+      if (lenSq < 0.0001) continue;
+      const t = Math.max(0, Math.min(1, ((entity.x - l.x1) * vx + (entity.z - l.z1) * vz) / lenSq));
+      const px = l.x1 + vx * t;
+      const pz = l.z1 + vz * t;
+      if (Math.hypot(entity.x - px, entity.z - pz) < radius + 0.16) return l;
+    }
+    return null;
+  }
+
   /** Returns the moving hazard overlapping the entity (stopped cars never hit; carsOnly skips NPC patrollers). */
   hazardHitting(entity, radius = 0.4, { carsOnly = false } = {}) {
     for (const h of this.hazards) {
@@ -398,7 +532,11 @@ export class LevelMechanics {
         best = h;
       }
     }
-    if (best) best.stunTimer = duration;
+    if (best) {
+      best.stunTimer = duration;
+      best.alerted = false;
+      best.chasing = false;
+    }
     return best;
   }
 
@@ -407,9 +545,11 @@ export class LevelMechanics {
   // ---------------------------------------------------------------------
   serialize() {
     return {
+      t: r2(this.time),
       s: this.switches.map((s) => (s.active ? 1 : 0)),
       e: this.elevators.map((e) => r2(e.phase)),
       h: this.hazards.map((h) => r2(h.phase)),
+      hx: this.hazards.map((h) => [r2(h.x), r2(h.z), r2(h.rotY), h.alerted ? 1 : 0]),
       st: this.hazards.map((h) => (h.stunTimer > 0 ? r2(h.stunTimer) : 0))
     };
   }
@@ -418,6 +558,7 @@ export class LevelMechanics {
   applyState(st) {
     const changed = [];
     if (!st) return changed;
+    if (Number.isFinite(st.t)) this.time = st.t;
     if (Array.isArray(st.s)) {
       st.s.forEach((v, i) => {
         const s = this.switches[i];
@@ -440,6 +581,21 @@ export class LevelMechanics {
     if (Array.isArray(st.st)) st.st.forEach((v, i) => { if (this.hazards[i] && Number.isFinite(v)) this.hazards[i].stunTimer = v; });
     this._computeElevators();
     this._computeHazards();
+    this._computeLasers();
+    if (Array.isArray(st.hx)) {
+      st.hx.forEach((arr, i) => {
+        const h = this.hazards[i];
+        if (!h || !Array.isArray(arr)) return;
+        if (h.chaseRange > 0 && arr[3]) {
+          h.x = arr[0];
+          h.z = arr[1];
+          h.rotY = arr[2];
+          h.alerted = true;
+        } else {
+          h.alerted = false;
+        }
+      });
+    }
     return changed;
   }
 }
@@ -489,7 +645,11 @@ const DEFAULT_FIXTURE_DIMS = {
   museum_pedestal: { w: 1.1, d: 1.1, h: 1.15 },
   control_desk: { w: 2.1, d: 0.86, h: 0.92 },
   shipping_container: { w: 4.2, d: 2.0, h: 2.4 },
-  yacht_helm: { w: 1.1, d: 0.9, h: 1.25 }
+  yacht_helm: { w: 1.1, d: 0.9, h: 1.25 },
+  lab_bench: { w: 2.6, d: 0.9, h: 0.98 },
+  server_rack: { w: 1.1, d: 0.9, h: 2.15 },
+  cryo_tank: { w: 1.25, d: 1.25, h: 2.25 },
+  spotlight_rig: { w: 0.9, d: 0.9, h: 1.9 }
 };
 
 /** Converts collidable static architectural fixtures into axis-aligned obstacle boxes. */

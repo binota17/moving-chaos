@@ -95,6 +95,10 @@ export class Game3DApp {
       );
     });
     this.gamepadManager.rumbleEnabled = this.settings.rumbleEnabled;
+    this.audioPopoverOpen = false;
+    this._lastAudioPreviewAt = 0;
+    soundManager.setMasterVolume(this.settings.masterVolume);
+    soundManager.setMasterEnabled(this.settings.masterEnabled);
     soundManager.setBgmVolume(this.settings.bgmVolume);
     soundManager.setSfxVolume(this.settings.sfxVolume);
     soundManager.setBgmEnabled(this.settings.bgmEnabled);
@@ -120,9 +124,15 @@ export class Game3DApp {
     this.trampolines = [];
     this.occluderMeshes = [];
     this.particles = [];
+    this.pingBeacons = [];
     this.trajectoryDots = [];
     this.sharedParticleGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
     this.sharedPuffGeo = new THREE.SphereGeometry(0.16, 10, 8);
+    this.sharedShardGeo = new THREE.OctahedronGeometry(0.11, 0);
+    this.sharedWoodGeo = new THREE.BoxGeometry(0.18, 0.06, 0.10);
+    this.sharedRingGeo = new THREE.RingGeometry(0.32, 0.46, 22);
+    this.sharedPingRingGeo = new THREE.RingGeometry(0.45, 0.65, 24);
+    this.sharedPingConeGeo = new THREE.ConeGeometry(0.24, 0.48, 8);
     this.puffMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.78 });
     this.particleMatCache = new Map();
 
@@ -342,14 +352,29 @@ export class Game3DApp {
   }
 
   initTrajectoryDots() {
-    const dotGeo = new THREE.SphereGeometry(0.11, 8, 8);
-    const dotMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-    for (let i = 0; i < 14; i++) {
-      const m = new THREE.Mesh(dotGeo, dotMat);
+    const dotGeo = new THREE.SphereGeometry(0.10, 8, 8);
+    this.trajectoryDotMat = new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.9 });
+    for (let i = 0; i < 18; i++) {
+      const m = new THREE.Mesh(dotGeo, this.trajectoryDotMat);
       m.visible = false;
       this.scene.add(m);
       this.trajectoryDots.push(m);
     }
+    this.aimLandingMat = new THREE.MeshBasicMaterial({
+      color: 0xfef08a,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+      depthTest: false
+    });
+    this.aimLandingRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.40, 0.56, 24),
+      this.aimLandingMat
+    );
+    this.aimLandingRing.rotation.x = -Math.PI / 2;
+    this.aimLandingRing.renderOrder = 99;
+    this.aimLandingRing.visible = false;
+    this.scene.add(this.aimLandingRing);
   }
 
   initHelpers3D() {
@@ -507,13 +532,22 @@ export class Game3DApp {
         if (p.bobi.disposeBadge) p.bobi.disposeBadge();
       }
     });
+    const sharedGeos = new Set([
+      this.sharedParticleGeo,
+      this.sharedPuffGeo,
+      this.sharedShardGeo,
+      this.sharedWoodGeo,
+      this.sharedRingGeo,
+      this.sharedPingRingGeo,
+      this.sharedPingConeGeo
+    ]);
     const sharedMats = new Set(this.particleMatCache.values());
     while (this.levelGroup.children.length > 0) {
       const child = this.levelGroup.children[0];
       this.levelGroup.remove(child);
       child.traverse((obj) => {
         if ((!obj.isMesh && !obj.isSprite) || obj.isSkinnedMesh) return;
-        if (obj.geometry && obj.geometry !== this.sharedParticleGeo && obj.geometry !== this.sharedPuffGeo && !obj.userData.sharedGeometry && !obj.userData.sharedAsset) {
+        if (obj.geometry && !sharedGeos.has(obj.geometry) && !obj.userData.sharedGeometry && !obj.userData.sharedAsset) {
           obj.geometry.dispose();
         }
         if (obj.material) {
@@ -533,6 +567,7 @@ export class Game3DApp {
     this.trampolines = [];
     this.occluderMeshes = [];
     this.particles = [];
+    this.pingBeacons = [];
     this.mechanics = null;
     this.mechVisuals = null;
     this.overworld = null;
@@ -541,6 +576,7 @@ export class Game3DApp {
     this.lastP2SentPayload = '';
     this.pendingNetEvents = [];
     this.trajectoryDots.forEach(d => d.visible = false);
+    if (this.aimLandingRing) this.aimLandingRing.visible = false;
     if (this.grabHighlightRing) this.grabHighlightRing.visible = false;
     if (this.truckGuideArrow) this.truckGuideArrow.visible = false;
   }
@@ -587,18 +623,28 @@ export class Game3DApp {
       // Clear & dispose previous level objects
       this.clearLevelObjects();
 
-    // 1. Build Dynamic Lawn Ground, Multi-Roads & Patterned House Floor Zones
+    // 1. Build Dynamic Lawn / Sci-Fi Spaceport Ground, Multi-Roads & Patterned House Floor Zones
+    const isSciFi = def.chapter === 4 || lvlId >= 13;
+    if (this.scene) {
+      this.scene.background.setHex(isSciFi ? 0x0f172a : 0xa7e0fb);
+      if (this.scene.fog) {
+        this.scene.fog.color.setHex(isSciFi ? 0x1e293b : 0xc2ebfd);
+      }
+    }
     const yardW = (def.floorSize?.w || 26) + 14;
     const yardD = (def.floorSize?.d || 18) + 10;
-    const lawnTex = getLawnTex().clone();
-    lawnTex.wrapS = THREE.RepeatWrapping;
-    lawnTex.wrapT = THREE.RepeatWrapping;
-    lawnTex.repeat.set(Math.max(6, Math.round(yardW / 5.5)), Math.max(4, Math.round(yardD / 5.5)));
-    lawnTex.needsUpdate = true;
-    const yard = new THREE.Mesh(
-      new THREE.BoxGeometry(yardW, 0.8, yardD),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, map: lawnTex, roughness: 0.92 })
-    );
+    let yardMat;
+    if (isSciFi) {
+      yardMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.72, metalness: 0.25 });
+    } else {
+      const lawnTex = getLawnTex().clone();
+      lawnTex.wrapS = THREE.RepeatWrapping;
+      lawnTex.wrapT = THREE.RepeatWrapping;
+      lawnTex.repeat.set(Math.max(6, Math.round(yardW / 5.5)), Math.max(4, Math.round(yardD / 5.5)));
+      lawnTex.needsUpdate = true;
+      yardMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: lawnTex, roughness: 0.92 });
+    }
+    const yard = new THREE.Mesh(new THREE.BoxGeometry(yardW, 0.8, yardD), yardMat);
     yard.position.set(0.0, -0.42, 0);
     yard.receiveShadow = true;
     this.levelGroup.add(yard);
@@ -664,6 +710,18 @@ export class Game3DApp {
       } else if (lvlId === 12) {
         styleKey = 'parquet_lavender';
         baseHex = '#fef08a';
+      } else if (lvlId === 13) {
+        styleKey = 'lab_grid';
+        baseHex = '#bae6fd';
+      } else if (lvlId === 14) {
+        styleKey = 'space_deck';
+        baseHex = '#cbd5e1';
+      } else if (lvlId === 15) {
+        styleKey = zIdx === 0 ? 'space_deck' : 'lab_grid';
+        baseHex = '#bae6fd';
+      } else if (lvlId === 16) {
+        styleKey = 'space_deck';
+        baseHex = '#cbd5e1';
       }
       const patTex = getFloorPatternTex(styleKey, baseHex).clone();
       patTex.wrapS = THREE.RepeatWrapping;
@@ -739,7 +797,11 @@ export class Game3DApp {
       9: '#818cf8',
       10: '#38bdf8',
       11: '#64748b',
-      12: '#f59e0b'
+      12: '#f59e0b',
+      13: '#38bdf8',
+      14: '#a855f7',
+      15: '#0284c7',
+      16: '#22d3ee'
     };
     const wallHex = wallPalette[lvlId] || '#e59467';
     def.walls.forEach((w) => {
@@ -797,7 +859,9 @@ export class Game3DApp {
       washer: { footW: 0.84, footD: 0.84 },
       stove: { footW: 0.88, footD: 0.84 },
       safe: { footW: 0.84, footD: 0.84 },
-      generator: { footW: 0.92, footD: 0.78 }
+      generator: { footW: 0.92, footD: 0.78 },
+      cryo_pod: { footW: 1.02, footD: 0.92 },
+      server_unit: { footW: 0.92, footD: 0.82 }
     };
 
     def.items.forEach((iDef, idx) => {
@@ -885,6 +949,9 @@ export class Game3DApp {
       dashTimer: 0,
       dashCooldown: 0,
       dashHitCooldown: 0,
+      slapCooldown: 0,
+      pingCooldown: 0,
+      sweatTimer: 0,
       catchBoostTimer: 0,
       puffTimer: 0,
       squashX: 1.0,
@@ -979,11 +1046,18 @@ export class Game3DApp {
       const isP1GrabKey = isSingleKeyboard ? code === 'KeyJ' : code === 'KeyC';
       const isP1ThrowKey = isSingleKeyboard ? code === 'KeyK' : code === 'KeyV';
       const isP1DashKey = code === 'KeyF';
+      const isP1SlapKey = code === 'KeyE';
+      const isP1PingKey = code === 'KeyT';
 
       if (!wasDown && isLanClient && p2) {
         if (code === 'Space') this.playerJump(p2);
         if (isP1GrabKey) this.sendClientActionSafe('grab', p2);
         if (isP1DashKey && this.triggerDash(p2)) this.sendClientActionSafe('dash', p2);
+        if (isP1SlapKey && this.triggerSlap(p2)) this.sendClientActionSafe('slap', p2);
+        if (isP1PingKey) {
+          this.triggerPing(p2);
+          this.sendClientActionSafe('ping', p2);
+        }
         if (isP1ThrowKey && p2.holdingItem) {
           if (p2.holdingItem.isCarryOnly) {
             this.sendClientActionSafe('throw', p2, false);
@@ -995,6 +1069,8 @@ export class Game3DApp {
         if (code === 'Space') this.playerJump(p1);
         if (isP1GrabKey) this.toggleGrab(p1);
         if (isP1DashKey) this.triggerDash(p1);
+        if (isP1SlapKey) this.triggerSlap(p1);
+        if (isP1PingKey) this.triggerPing(p1);
         if (isP1ThrowKey && p1.holdingItem) {
           if (p1.holdingItem.isCarryOnly) {
             this.releaseThrow(p1);
@@ -1007,6 +1083,8 @@ export class Game3DApp {
       if (!wasDown && p2 && this.isLocalMultiMode()) {
         if (code === 'ShiftRight' || code === 'Enter' || code === 'Numpad0') this.playerJump(p2);
         if (code === 'Slash' || code === 'Numpad3') this.triggerDash(p2);
+        if (code === 'Period' || code === 'NumpadDecimal') this.triggerSlap(p2);
+        if (code === 'Quote' || code === 'NumpadAdd') this.triggerPing(p2);
         if (code === 'KeyK' || code === 'Numpad1') this.toggleGrab(p2);
         if ((code === 'KeyL' || code === 'Numpad2') && p2.holdingItem) {
           if (p2.holdingItem.isCarryOnly) {
@@ -1060,6 +1138,14 @@ export class Game3DApp {
       if (!activePlayer) return;
 
       this.updateMouseAim(e);
+
+      // Middle-click drops a smart Quick Ping beacon at cursor world position
+      if (e.button === 1) {
+        e.preventDefault();
+        this.triggerPing(activePlayer, this.aimWorldPoint);
+        if (isLanClient) this.sendClientActionSafe('ping', activePlayer, true);
+        return;
+      }
 
       // Right-click drops held item gently (or grabs when empty); Left-click grabs or aims+throws
       if (e.button === 2) {
@@ -1149,9 +1235,20 @@ export class Game3DApp {
   }
 
   bindDOM() {
+    // Unlock Web Audio cleanly on first user interaction & start menu/overworld groove
+    const unlockAudioOnce = () => {
+      soundManager.init();
+      this.syncMenuOrActiveBgm();
+      window.removeEventListener('pointerdown', unlockAudioOnce, true);
+      window.removeEventListener('keydown', unlockAudioOnce, true);
+    };
+    window.addEventListener('pointerdown', unlockAudioOnce, true);
+    window.addEventListener('keydown', unlockAudioOnce, true);
+
     // Variant Selector Cards
     document.querySelectorAll('.variant-card').forEach((card) => {
       card.addEventListener('click', () => {
+        soundManager.uiClick();
         document.querySelectorAll('.variant-card').forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
         this.selectedVariantP1 = card.dataset.variant;
@@ -1162,6 +1259,7 @@ export class Game3DApp {
     // Level Selector Cards (inside Map Select Modal)
     document.querySelectorAll('.level-card').forEach((c) => {
       c.addEventListener('click', () => {
+        soundManager.uiClick();
         document.querySelectorAll('.level-card').forEach(x => x.classList.remove('selected'));
         c.classList.add('selected');
         this.currentLevel = parseInt(c.dataset.level, 10);
@@ -1258,46 +1356,88 @@ export class Game3DApp {
       this.setLanguage(this.settings.lang === 'vi' ? 'en' : 'vi');
     });
 
-    // Pause / Settings Modal controls
-    document.getElementById('set-lang-vi')?.addEventListener('click', () => this.setLanguage('vi'));
-    document.getElementById('set-lang-en')?.addEventListener('click', () => this.setLanguage('en'));
-    document.getElementById('bgm-vol-slider')?.addEventListener('input', (e) => {
+    // Pause / Settings Modal & Quick Audio Mixer controls
+    document.getElementById('set-lang-vi')?.addEventListener('click', () => { soundManager.uiClick(); this.setLanguage('vi'); });
+    document.getElementById('set-lang-en')?.addEventListener('click', () => { soundManager.uiClick(); this.setLanguage('en'); });
+
+    const bindVolSlider = (id, channel) => {
+      document.getElementById(id)?.addEventListener('input', (e) => {
+        this.applyVolumeChange(channel, Number(e.target.value));
+      });
+    };
+    bindVolSlider('master-vol-slider', 'master');
+    bindVolSlider('mix-master-slider', 'master');
+    bindVolSlider('bgm-vol-slider', 'bgm');
+    bindVolSlider('mix-bgm-slider', 'bgm');
+    bindVolSlider('sfx-vol-slider', 'sfx');
+    bindVolSlider('mix-sfx-slider', 'sfx');
+
+    const bindMuteBtn = (id, channel) => {
+      document.getElementById(id)?.addEventListener('click', () => {
+        this.toggleAudioChannel(channel);
+      });
+    };
+    bindMuteBtn('set-master-mute', 'master');
+    bindMuteBtn('mix-master-mute', 'master');
+    bindMuteBtn('set-bgm-mute', 'bgm');
+    bindMuteBtn('mix-bgm-mute', 'bgm');
+    bindMuteBtn('music-btn', 'bgm');
+    bindMuteBtn('set-sfx-mute', 'sfx');
+    bindMuteBtn('mix-sfx-mute', 'sfx');
+
+    document.getElementById('menu-audio-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
       soundManager.init();
-      const val = Number(e.target.value) / 100;
-      this.settings.bgmVolume = val;
-      this.settings.bgmEnabled = val > 0.001;
-      soundManager.setBgmVolume(val);
-      if (this.settings.bgmEnabled && this.gameState === 'PLAYING') soundManager.startBGM();
-      saveSettings(this.settings);
-      this.syncAudioButtons();
+      this.toggleAudioPopover();
     });
-    document.getElementById('sfx-vol-slider')?.addEventListener('input', (e) => {
+    document.getElementById('overworld-audio-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
       soundManager.init();
-      const val = Number(e.target.value) / 100;
-      this.settings.sfxVolume = val;
-      this.settings.sfxEnabled = val > 0.001;
-      soundManager.setSfxVolume(val);
-      saveSettings(this.settings);
-      this.syncAudioButtons();
+      this.toggleAudioPopover();
     });
+    document.getElementById('sound-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      soundManager.init();
+      this.toggleAudioPopover();
+    });
+    document.getElementById('audio-popover-close')?.addEventListener('click', () => {
+      this.toggleAudioPopover(false);
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (!this.audioPopoverOpen) return;
+      const pop = document.getElementById('audio-popover');
+      const hitTrigger = e.target?.closest?.('#audio-popover, #menu-audio-btn, #overworld-audio-btn, #sound-btn');
+      if (pop && !hitTrigger) this.toggleAudioPopover(false);
+    });
+
     document.getElementById('set-gfx-btn')?.addEventListener('click', () => {
+      soundManager.uiClick();
       this.togglePerformanceMode();
       this.syncSettingsModalUI();
     });
     document.getElementById('set-rumble-btn')?.addEventListener('click', () => {
+      soundManager.uiClick();
       this.settings.rumbleEnabled = !this.settings.rumbleEnabled;
       this.gamepadManager.rumbleEnabled = this.settings.rumbleEnabled;
       saveSettings(this.settings);
       if (this.settings.rumbleEnabled) this.gamepadManager.rumble(0, 0.35, 80);
       this.syncSettingsModalUI();
     });
-    document.getElementById('set-fs-btn')?.addEventListener('click', () => this.toggleFullscreen());
-    document.getElementById('pause-resume-btn')?.addEventListener('click', () => this.closePauseOrSettings());
+    document.getElementById('set-fs-btn')?.addEventListener('click', () => {
+      soundManager.uiClick();
+      this.toggleFullscreen();
+    });
+    document.getElementById('pause-resume-btn')?.addEventListener('click', () => {
+      soundManager.uiClick();
+      this.closePauseOrSettings();
+    });
     document.getElementById('pause-restart-btn')?.addEventListener('click', () => {
+      soundManager.uiClick();
       this.closePauseOrSettings();
       this.requestOrRestartMatch();
     });
     document.getElementById('pause-menu-btn')?.addEventListener('click', () => {
+      soundManager.uiClick();
       this.closePauseOrSettings();
       this.returnToMenu();
     });
@@ -1306,23 +1446,13 @@ export class Game3DApp {
     this.bindTouchControls();
 
     document.getElementById('joystick-btn')?.addEventListener('click', () => {
+      soundManager.uiClick();
       const zone = document.getElementById('touch-joystick-zone');
       if (zone) zone.classList.toggle('visible');
     });
 
-    document.getElementById('sound-btn')?.addEventListener('click', () => {
-      soundManager.init();
-      this.settings.sfxEnabled = soundManager.toggleSFX();
-      saveSettings(this.settings);
-      this.syncAudioButtons();
-    });
-    document.getElementById('music-btn')?.addEventListener('click', () => {
-      soundManager.init();
-      this.settings.bgmEnabled = soundManager.toggleBGM();
-      saveSettings(this.settings);
-      this.syncAudioButtons();
-    });
     document.getElementById('perf-btn')?.addEventListener('click', () => {
+      soundManager.uiClick();
       const hq = this.togglePerformanceMode();
       this.ui.addFeedPill(`<span>${hq ? t('set_gfx_high') : t('set_gfx_smooth')}</span>`, 'glass');
       this.syncSettingsModalUI();
@@ -1369,6 +1499,11 @@ export class Game3DApp {
         this.toggleGrab(p2);
       } else if (act.type === 'dash') {
         this.triggerDash(p2, { isRemote: true });
+      } else if (act.type === 'slap') {
+        this.triggerSlap(p2, { isRemote: true });
+      } else if (act.type === 'ping') {
+        const pt = act.useAim && Number.isFinite(act.aimX) ? { x: act.aimX, z: act.aimZ } : null;
+        this.triggerPing(p2, pt, { isRemote: true });
       } else if (act.type === 'throw' && p2.holdingItem) {
         p2.throwPower = act.power ?? 0.6;
         if (act.useAim) {
@@ -1513,13 +1648,20 @@ export class Game3DApp {
     setText('touch-jump-btn', t('touch_jump'));
     setText('touch-grab-btn', t('touch_grab'));
     setText('touch-throw-btn', t('touch_throw'));
+    setText('touch-slap-btn', t('touch_slap'));
+    setText('touch-ping-btn', t('touch_ping'));
     setText('end-earnings-label', t('end_earnings_label'));
     setText('replay-btn', t('end_replay_btn'));
     setText('menu-back-btn', t('end_menu_btn'));
 
     setText('set-lang-label', t('set_language'));
-    setText('set-bgm-label', t('set_bgm_vol'));
-    setText('set-sfx-label', t('set_sfx_vol'));
+    setText('set-master-label', `🔈 ${t('set_master_vol')}`);
+    setText('set-bgm-label', `🎵 ${t('set_bgm_vol')}`);
+    setText('set-sfx-label', `🔊 ${t('set_sfx_vol')}`);
+    setText('audio-mixer-title', `🎛️ ${t('audio_mixer_title')}`);
+    setText('mix-master-label', t('set_master_vol'));
+    setText('mix-bgm-label', t('set_bgm_vol'));
+    setText('mix-sfx-label', t('set_sfx_vol'));
     setText('set-gfx-label', t('set_graphics'));
     setText('set-rumble-label', t('set_rumble'));
     setText('set-fs-label', t('set_fullscreen'));
@@ -1543,11 +1685,12 @@ export class Game3DApp {
         btn.type = 'button';
         btn.className = 'skin-swatch' + (this.selectedSkin === skin.id ? ' selected' : '') + (!unlocked ? ' locked' : '');
         btn.style.background = skin.swatch;
-        btn.title = `${this.settings.lang === 'en' ? skin.nameEn : skin.nameVi}${unlocked ? '' : ` (${skin.reqStars}★)`}`;
-        btn.innerHTML = unlocked ? (this.selectedSkin === skin.id ? '✓' : '') : `<span class="skin-lock-tag">🔒${skin.reqStars}★</span>`;
+        btn.title = `${this.settings.lang === 'en' ? (skin.labelEn || skin.nameEn || skin.id) : (skin.labelVi || skin.nameVi || skin.id)}${unlocked ? '' : ` (${skin.starsRequired ?? skin.reqStars ?? 0}★)`}`;
+        const reqStars = skin.starsRequired ?? skin.reqStars ?? 0;
+        btn.innerHTML = unlocked ? (this.selectedSkin === skin.id ? '✓' : '') : `<span class="skin-lock-tag">🔒${reqStars}★</span>`;
         btn.addEventListener('click', () => {
           if (!unlocked) {
-            this.ui.addFeedPill(`<span>🔒 ${t('skin_locked_toast', { stars: skin.reqStars })}</span>`, 'bounce');
+            this.ui.addFeedPill(`<span>🔒 ${t('skin_locked_toast', { stars: reqStars })}</span>`, 'bounce');
             soundManager.bonk();
             return;
           }
@@ -1648,7 +1791,11 @@ export class Game3DApp {
       9: '#6366f1',
       10: '#0ea5e9',
       11: '#475569',
-      12: '#f59e0b'
+      12: '#f59e0b',
+      13: '#38bdf8',
+      14: '#a855f7',
+      15: '#0284c7',
+      16: '#22d3ee'
     };
     const startOverlay = document.getElementById('start-overlay');
     if (startOverlay) startOverlay.style.setProperty('--active-lvl-accent', accents[id] || '#f59e0b');
@@ -1705,22 +1852,121 @@ export class Game3DApp {
     }
   }
 
-  syncAudioButtons() {
-    const sfxBtn = document.getElementById('sound-btn');
-    const bgmBtn = document.getElementById('music-btn');
-    if (sfxBtn) sfxBtn.innerText = soundManager.sfxOn && soundManager.sfxVolume > 0.001 ? '🔊' : '🔈';
-    if (bgmBtn) bgmBtn.innerText = soundManager.bgmOn && soundManager.bgmVolume > 0.001 ? '🎵' : '🔇';
+  getDesiredBgmTheme() {
+    if (this.gameState === 'OVERWORLD') return 'overworld';
+    if (this.gameState === 'MENU') return 'menu';
+    const ch = LEVELS_3D[this.currentLevel]?.chapter || 1;
+    return `chapter${ch}`;
+  }
 
-    const bgmSlider = document.getElementById('bgm-vol-slider');
-    const sfxSlider = document.getElementById('sfx-vol-slider');
-    const bgmVal = document.getElementById('bgm-vol-val');
-    const sfxVal = document.getElementById('sfx-vol-val');
+  syncMenuOrActiveBgm() {
+    if (this.gameState === 'GAMEOVER') return;
+    if (!this.settings.masterEnabled || this.settings.masterVolume <= 0.001) return;
+    if (!this.settings.bgmEnabled || this.settings.bgmVolume <= 0.001) return;
+    const theme = this.getDesiredBgmTheme();
+    soundManager.setBgmTheme(theme);
+    soundManager.startBGM(theme);
+  }
+
+  toggleAudioPopover(force = null) {
+    const pop = document.getElementById('audio-popover');
+    if (!pop) return;
+    this.audioPopoverOpen = force === null ? !this.audioPopoverOpen : !!force;
+    pop.classList.toggle('open', this.audioPopoverOpen);
+    if (this.audioPopoverOpen) this.syncAudioButtons();
+  }
+
+  applyVolumeChange(channel, pctVal) {
+    soundManager.init();
+    const vol = Math.max(0, Math.min(1, pctVal / 100));
+    if (channel === 'master') {
+      this.settings.masterVolume = vol;
+      this.settings.masterEnabled = vol > 0.001;
+      soundManager.setMasterVolume(vol);
+      if (this.settings.masterEnabled) this.syncMenuOrActiveBgm();
+    } else if (channel === 'bgm') {
+      this.settings.bgmVolume = vol;
+      this.settings.bgmEnabled = vol > 0.001;
+      soundManager.setBgmVolume(vol);
+      if (this.settings.bgmEnabled) this.syncMenuOrActiveBgm();
+    } else if (channel === 'sfx') {
+      this.settings.sfxVolume = vol;
+      this.settings.sfxEnabled = vol > 0.001;
+      soundManager.setSfxVolume(vol);
+    }
+
+    if (channel === 'master' || channel === 'sfx') {
+      const now = performance.now();
+      if (now - this._lastAudioPreviewAt > 115 && vol > 0.01) {
+        this._lastAudioPreviewAt = now;
+        soundManager.uiTick();
+      }
+    }
+    saveSettings(this.settings);
+    this.syncAudioButtons();
+  }
+
+  toggleAudioChannel(channel) {
+    soundManager.init();
+    if (channel === 'master') {
+      this.settings.masterEnabled = soundManager.toggleMaster();
+      this.settings.masterVolume = soundManager.masterVolume;
+      if (this.settings.masterEnabled) this.syncMenuOrActiveBgm();
+    } else if (channel === 'bgm') {
+      this.settings.bgmEnabled = soundManager.toggleBGM();
+      this.settings.bgmVolume = soundManager.bgmVolume;
+      if (this.settings.bgmEnabled) this.syncMenuOrActiveBgm();
+    } else if (channel === 'sfx') {
+      this.settings.sfxEnabled = soundManager.toggleSFX();
+      this.settings.sfxVolume = soundManager.sfxVolume;
+    }
+    soundManager.uiClick();
+    saveSettings(this.settings);
+    this.syncAudioButtons();
+  }
+
+  syncAudioButtons() {
+    const masterActive = this.settings.masterEnabled && this.settings.masterVolume > 0.001;
+    const bgmActive = masterActive && this.settings.bgmEnabled && this.settings.bgmVolume > 0.001;
+    const sfxActive = masterActive && this.settings.sfxEnabled && this.settings.sfxVolume > 0.001;
+
+    const masterIcon = masterActive ? (this.settings.masterVolume > 0.45 ? '🔊' : '🔉') : '🔇';
+    ['sound-btn', 'menu-audio-btn', 'overworld-audio-btn'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.innerText = masterIcon;
+    });
+    const bgmBtn = document.getElementById('music-btn');
+    if (bgmBtn) bgmBtn.innerText = bgmActive ? '🎵' : '🔇';
+
+    const masterPct = Math.round((this.settings.masterEnabled ? this.settings.masterVolume : 0) * 100);
     const bgmPct = Math.round((this.settings.bgmEnabled ? this.settings.bgmVolume : 0) * 100);
     const sfxPct = Math.round((this.settings.sfxEnabled ? this.settings.sfxVolume : 0) * 100);
-    if (bgmSlider) bgmSlider.value = String(bgmPct);
-    if (sfxSlider) sfxSlider.value = String(sfxPct);
-    if (bgmVal) bgmVal.innerText = `${bgmPct}%`;
-    if (sfxVal) sfxVal.innerText = `${sfxPct}%`;
+
+    const setVal = (sliderId, textId, pct) => {
+      const sl = document.getElementById(sliderId);
+      const tx = document.getElementById(textId);
+      if (sl) sl.value = String(pct);
+      if (tx) tx.innerText = `${pct}%`;
+    };
+    setVal('master-vol-slider', 'master-vol-val', masterPct);
+    setVal('mix-master-slider', 'mix-master-val', masterPct);
+    setVal('bgm-vol-slider', 'bgm-vol-val', bgmPct);
+    setVal('mix-bgm-slider', 'mix-bgm-val', bgmPct);
+    setVal('sfx-vol-slider', 'sfx-vol-val', sfxPct);
+    setVal('mix-sfx-slider', 'mix-sfx-val', sfxPct);
+
+    const setMuteBtn = (id, active, onIcon, offIcon) => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.innerText = active ? onIcon : offIcon;
+      b.classList.toggle('muted', !active);
+    };
+    setMuteBtn('set-master-mute', masterActive, masterIcon, '🔇');
+    setMuteBtn('mix-master-mute', masterActive, masterIcon, '🔇');
+    setMuteBtn('set-bgm-mute', this.settings.bgmEnabled && this.settings.bgmVolume > 0.001, '🎵', '🔇');
+    setMuteBtn('mix-bgm-mute', this.settings.bgmEnabled && this.settings.bgmVolume > 0.001, '🎵', '🔇');
+    setMuteBtn('set-sfx-mute', sfxActive, '🔔', '🔕');
+    setMuteBtn('mix-sfx-mute', sfxActive, '🔔', '🔕');
   }
 
   syncSettingsModalUI() {
@@ -1758,6 +2004,10 @@ export class Game3DApp {
   }
 
   handlePauseToggle() {
+    if (this.audioPopoverOpen) {
+      this.toggleAudioPopover(false);
+      return;
+    }
     if (this.settingsModalOpen) {
       this.closePauseOrSettings();
     } else {
@@ -1766,6 +2016,7 @@ export class Game3DApp {
   }
 
   openPauseOrSettings() {
+    this.toggleAudioPopover(false);
     if (this.gameState === 'PLAYING' && this.gameMode !== 'LAN_COOP') {
       this.gameState = 'PAUSED';
     }
@@ -1787,10 +2038,12 @@ export class Game3DApp {
 
   returnToMenu() {
     this.settingsModalOpen = false;
+    this.toggleAudioPopover(false);
     this.ui.setPauseModalVisible(false);
     this.ui.hideOverworldHUD();
     this.gameState = 'MENU';
-    soundManager.stopBGM();
+    soundManager.setBgmUrgency(false);
+    this.syncMenuOrActiveBgm();
     this.renderProgressCards();
     this.ui.showStartMenu();
     if (!this.players[0]) {
@@ -1801,14 +2054,16 @@ export class Game3DApp {
   enterOverworld() {
     soundManager.init();
     this.settingsModalOpen = false;
+    this.toggleAudioPopover(false);
     this.closeControlsModal();
     this.closeMapSelectModal();
     this.ui.setPauseModalVisible(false);
     if (this.timerInterval) clearInterval(this.timerInterval);
-    soundManager.stopBGM();
 
     this.clearLevelObjects();
     this.gameState = 'OVERWORLD';
+    soundManager.setBgmUrgency(false);
+    this.syncMenuOrActiveBgm();
     this.overworldLastPadId = null;
     this.overworld = new Overworld3D(this.levelGroup, this.progressStore, this.currentLevel);
     this.targetCamAngle = 0.0;
@@ -1829,7 +2084,9 @@ export class Game3DApp {
 
   async exitOverworldToMenu() {
     this.ui.hideOverworldHUD();
+    this.toggleAudioPopover(false);
     this.gameState = 'MENU';
+    this.syncMenuOrActiveBgm();
     this.targetCamAngle = 0.22;
     await this.setupLevel(this.currentLevel);
     this.renderProgressCards();
@@ -1967,6 +2224,16 @@ export class Game3DApp {
       throwBtn.addEventListener('pointerup', finishThrow);
       throwBtn.addEventListener('pointercancel', finishThrow);
     }
+    document.getElementById('touch-slap-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      soundManager.init();
+      this.triggerActionSlap();
+    });
+    document.getElementById('touch-ping-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      soundManager.init();
+      this.triggerActionPing();
+    });
   }
 
   checkLANStatus() {
@@ -2095,6 +2362,25 @@ export class Game3DApp {
     }
   }
 
+  triggerActionSlap() {
+    if (this.gameState !== 'PLAYING') return;
+    const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
+    const activeP = isLanClient ? this.players[1] : this.players[0];
+    if (activeP && this.triggerSlap(activeP) && isLanClient) {
+      this.sendClientActionSafe('slap', activeP);
+    }
+  }
+
+  triggerActionPing() {
+    if (this.gameState !== 'PLAYING') return;
+    const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
+    const activeP = isLanClient ? this.players[1] : this.players[0];
+    if (activeP) {
+      this.triggerPing(activeP);
+      if (isLanClient) this.sendClientActionSafe('ping', activeP);
+    }
+  }
+
   startOrRestartMatch() {
     this.startGame();
     if (this.gameMode === 'LAN_COOP' && this.network.role === 'host' && this.network.isConnected) {
@@ -2149,15 +2435,19 @@ export class Game3DApp {
     p._emoteIdx = ((p._emoteIdx || 0) + 1) % emotes.length;
     p.squashX = 1.22;
     p.squashY = 0.82;
-    soundManager.grab();
+    soundManager.emote();
     this.emitBurst(p.x, p.y + 1.4, p.z, 0xfde047, 8);
     this.spawnFloatingText(emotes[p._emoteIdx], p.x, p.y + 2.05, p.z, '#fde047');
   }
 
   async startGame() {
     soundManager.init();
-    if (this.settings.bgmEnabled && this.settings.bgmVolume > 0.001) {
-      soundManager.startBGM();
+    this.toggleAudioPopover(false);
+    const chTheme = `chapter${LEVELS_3D[this.currentLevel]?.chapter || 1}`;
+    soundManager.setBgmUrgency(false);
+    soundManager.setBgmTheme(chTheme);
+    if (this.settings.masterEnabled && this.settings.masterVolume > 0.001 && this.settings.bgmEnabled && this.settings.bgmVolume > 0.001) {
+      soundManager.startBGM(chTheme);
     }
     soundManager.horn();
 
@@ -2200,6 +2490,10 @@ export class Game3DApp {
             this.syncHUD();
           } else {
             this.timeLeft--;
+            soundManager.setBgmUrgency(this.timeLeft > 0 && this.timeLeft <= 15);
+            if (this.timeLeft > 0 && this.timeLeft <= 10) {
+              soundManager.countdownTick(this.timeLeft <= 3);
+            }
             this.syncHUD();
             if (this.timeLeft <= 0 && this.itemsDelivered < this.targetItemsCount) {
               this.endGame();
@@ -2214,6 +2508,7 @@ export class Game3DApp {
     if (this.gameState === 'GAMEOVER') return;
     this.gameState = 'GAMEOVER';
     this.settingsModalOpen = false;
+    this.toggleAudioPopover(false);
     soundManager.stopBGM();
     if (this.timerInterval) clearInterval(this.timerInterval);
 
@@ -2235,11 +2530,19 @@ export class Game3DApp {
     });
     this.renderProgressCards();
 
-    // Trigger Victory dance if successful!
-    if (this.itemsDelivered >= this.targetItemsCount) {
-      this.players.forEach(p => p.bobi.playAnimation('CHR_Base_Celebrate', 0.1));
+    // Trigger Victory dance or comical game-over jingle
+    if (this.itemsDelivered >= this.targetItemsCount && starEval.completed) {
+      soundManager.victory();
+      this.players.forEach((p) => {
+        p.bobi.playAnimation('CHR_Base_Celebrate', 0.1);
+        this.emitDebris(p.x, p.y + 1.8, p.z, 'confetti', 16);
+      });
+      if (this.truck) {
+        this.emitDebris(this.truck.x, 1.8, this.truck.z, 'confetti', 24);
+      }
       this.rumbleAllActive(0.55, 180);
     } else {
+      soundManager.gameOver();
       this.rumbleAllActive(0.75, 220);
     }
 
@@ -2349,55 +2652,252 @@ export class Game3DApp {
     return true;
   }
 
+  triggerSlap(p, { isRemote = false } = {}) {
+    if (!p || p.stunTimer > 0 || this.gameState !== 'PLAYING') return false;
+    if (!isRemote && (p.slapCooldown || 0) > 0) return false;
+    p.slapCooldown = 0.55;
+    p.squashX = 1.28;
+    p.squashY = 0.78;
+    p.bobi?.playAnimation('CHR_Base_Throw', 0.05);
+
+    const sx = p.x + Math.sin(p.rotY) * 0.85;
+    const sz = p.z + Math.cos(p.rotY) * 0.85;
+    soundManager.slap();
+    this.rumblePlayer(p, 0.3, 60);
+    this.emitShockRing(sx, p.y + 0.25, sz, 0xf472b6, 1.9);
+
+    if (isRemote) return true;
+
+    let hitSomething = false;
+    // 1. Nudge/slap teammates playfully WITHOUT forcing item drop
+    for (const mate of this.players) {
+      if (mate === p || mate.stunTimer > 0) continue;
+      const dist = Math.hypot(mate.x - sx, mate.z - sz);
+      if (dist < 1.35 && Math.abs(mate.y - p.y) < 1.2) {
+        const dx = mate.x - p.x;
+        const dz = mate.z - p.z;
+        const d = Math.hypot(dx, dz) || 1;
+        mate.vx += (dx / d) * 7.2;
+        mate.vz += (dz / d) * 7.2;
+        mate.vy = Math.max(mate.vy, 2.8);
+        mate.squashX = 1.36;
+        mate.squashY = 0.70;
+        this.emitDebris(mate.x, mate.y + 0.9, mate.z, 'sweat', 6);
+        this.spawnFloatingText(t('mech_slap_mate'), mate.x, mate.y + 1.9, mate.z, '#f472b6');
+        hitSomething = true;
+      }
+    }
+
+    // 2. Stun chasing guards / drones / robots
+    if (this.mechanics) {
+      const stunnedHz = this.mechanics.stunPatrolNear(sx, p.y, sz, 1.75, 2.6);
+      if (stunnedHz) {
+        this.emitDebris(stunnedHz.x, 1.0, stunnedHz.z, 'electric', 12);
+        this.emitShockRing(stunnedHz.x, 0.25, stunnedHz.z, 0xfacc15, 2.5);
+        this.spawnFloatingText(t('mech_slap_guard'), stunnedHz.x, 2.1, stunnedHz.z, '#fde047');
+        this.pushNetEvent('patrol_stun', { x: stunnedHz.x, y: 1.0, z: stunnedHz.z });
+        hitSomething = true;
+      }
+    }
+
+    // 3. Playful nudge on nearby loose items
+    for (const it of this.items) {
+      if (it.isHeld || it.isDelivered || it.isBroken) continue;
+      if (Math.hypot(it.x - sx, it.z - sz) < 1.25 && Math.abs(it.y - p.y) < 1.2) {
+        const dx = it.x - p.x;
+        const dz = it.z - p.z;
+        const d = Math.hypot(dx, dz) || 1;
+        it.vx += (dx / d) * 4.8;
+        it.vz += (dz / d) * 4.8;
+        it.vy = Math.max(it.vy, 2.4);
+        hitSomething = true;
+      }
+    }
+
+    this.pushNetEvent('slap', { x: sx, y: p.y + 0.8, z: sz, hit: hitSomething ? 1 : 0 });
+    return true;
+  }
+
+  triggerPing(p, targetPt = null, { isRemote = false } = {}) {
+    if (!p || this.gameState !== 'PLAYING') return false;
+    if (!isRemote && (p.pingCooldown || 0) > 0) return false;
+    p.pingCooldown = 0.65;
+
+    const bounds = this.getArenaBounds();
+    const px = THREE.MathUtils.clamp(targetPt ? targetPt.x : p.x, bounds.minX + 0.5, bounds.maxX - 0.5);
+    const pz = THREE.MathUtils.clamp(targetPt ? targetPt.z : p.z, bounds.minZ + 0.5, bounds.maxZ - 0.5);
+    const py = Math.max(0.08, this.getFloorHeightAt(px, pz, p.y));
+
+    const def = LEVELS_3D[this.currentLevel] || LEVELS_3D[1];
+    let label = t('ping_gather');
+    let colorHex = 0x38bdf8;
+    let cssHex = '#38bdf8';
+
+    const distTruck = def.truck ? Math.hypot(px - def.truck.x, pz - def.truck.z) : Infinity;
+    const nearSwitch = this.mechanics?.switches?.find(sw => Math.hypot(px - sw.x, pz - sw.z) < 2.6);
+    if (distTruck < 3.6) {
+      label = t('ping_truck');
+      colorHex = 0x22c55e;
+      cssHex = '#22c55e';
+    } else if (nearSwitch) {
+      label = t('ping_switch');
+      colorHex = 0xfacc15;
+      cssHex = '#eab308';
+    } else if (p.holdingItem && p.holdingItem.isCarryOnly) {
+      label = t('ping_help_carry');
+      colorHex = 0xf97316;
+      cssHex = '#f97316';
+    }
+
+    soundManager.ping();
+    this.spawnPingBeacon(px, py, pz, colorHex, label, cssHex);
+    if (!isRemote) {
+      this.pushNetEvent('ping', { x: px, y: py, z: pz, color: colorHex, css: cssHex, text: label });
+    }
+    return true;
+  }
+
+  spawnPingBeacon(x, y, z, colorHex = 0x38bdf8, label = '', cssHex = '#38bdf8') {
+    const g = new THREE.Group();
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: colorHex,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.92,
+      depthTest: false
+    });
+    const ring = new THREE.Mesh(this.sharedPingRingGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.06;
+
+    const coneMat = new THREE.MeshBasicMaterial({
+      color: colorHex,
+      transparent: true,
+      opacity: 0.92
+    });
+    const cone = new THREE.Mesh(this.sharedPingConeGeo, coneMat);
+    cone.rotation.x = Math.PI;
+    cone.position.y = 1.6;
+    g.add(ring, cone);
+    g.position.set(x, y, z);
+    this.levelGroup.add(g);
+    this.pingBeacons.push({ group: g, ring, cone, ringMat, coneMat, age: 0, maxAge: 3.4 });
+
+    if (label) {
+      this.spawnFloatingText(label, x, y + 2.25, z, cssHex);
+    }
+  }
+
+  updatePingBeacons(dt) {
+    for (let i = this.pingBeacons.length - 1; i >= 0; i--) {
+      const b = this.pingBeacons[i];
+      b.age += dt;
+      if (b.age >= b.maxAge) {
+        this.levelGroup.remove(b.group);
+        b.ringMat.dispose();
+        b.coneMat.dispose();
+        this.pingBeacons.splice(i, 1);
+        continue;
+      }
+      const p = b.age / b.maxAge;
+      const pulse = 0.95 + Math.sin(b.age * 9.0) * 0.25;
+      b.ring.scale.setScalar(pulse);
+      b.cone.position.y = 1.55 + Math.sin(b.age * 7.0) * 0.22;
+      b.cone.rotation.y += dt * 3.2;
+      const alpha = p > 0.72 ? (1 - p) / 0.28 : 1.0;
+      b.ringMat.opacity = alpha * 0.9;
+      b.coneMat.opacity = alpha * 0.9;
+    }
+  }
+
+  evaluateTruckBay(tk, wx, wz, it) {
+    const local = truckWorldToLocal(tk, wx, wz);
+    const halfW = Math.max(0.7, (tk.bedW || 4.2) * 0.5 - 0.52);
+    const halfD = Math.max(0.8, (tk.bedD || 4.6) * 0.5 - 0.52);
+    const isOversized = it.type === 'bed' || it.type === 'dining_table' || it.type === 'bookshelf' || it.type === 'piano' || it.type === 'cryo_pod';
+    const hw = isOversized ? 0.62 : 0.42;
+    const hd = isOversized ? 0.62 : 0.42;
+
+    const lx = THREE.MathUtils.clamp(local.lx, -halfW, halfW);
+    const lz = THREE.MathUtils.clamp(local.lz, -halfD, halfD);
+
+    const overlapsAt = (cx, cz, tier) => this.truckCargoPlacements.some(
+      (p) => p.tier === tier && Math.abs(p.lx - cx) < (p.hw + hw) * 0.85 && Math.abs(p.lz - cz) < (p.hd + hd) * 0.85
+    );
+
+    let aimedTier = 0;
+    while (aimedTier < 3 && overlapsAt(lx, lz, aimedTier)) aimedTier++;
+
+    // Scan clean grid bays for lowest open Tier (0 -> 1 -> 2)
+    let openBay = null;
+    for (let tier = 0; tier < 3 && !openBay; tier++) {
+      for (let gx = -halfW + 0.25; gx <= halfW - 0.25 && !openBay; gx += 0.75) {
+        for (let gz = -halfD + 0.25; gz <= halfD - 0.25 && !openBay; gz += 0.75) {
+          if (!overlapsAt(gx, gz, tier)) {
+            openBay = { lx: gx, lz: gz, tier };
+          }
+        }
+      }
+    }
+
+    return { lx, lz, hw, hd, aimedTier, openBay, halfW, halfD };
+  }
+
   mountDeliveredItemInTruck(it, landX = null, landZ = null) {
     const cargoMount = this.truck?.mesh?.userData?.cargoMount;
-    if (!cargoMount || !it?.mesh) return;
-    if (it.mesh.parent === cargoMount) return;
+    if (!cargoMount || !it?.mesh) return { neatPack: false };
+    if (it.mesh.parent === cargoMount) return { neatPack: false };
 
     const tk = LEVELS_3D[this.currentLevel]?.truck || this.truck || { x: 0, z: 0, bedW: 4.2, bedD: 4.6, rotY: 0 };
     const slot = this.deliveredSlotCount++;
     const wx = Number.isFinite(landX) ? landX : it.x;
     const wz = Number.isFinite(landZ) ? landZ : it.z;
-    const local = truckWorldToLocal(tk, wx, wz);
+    const plan = this.evaluateTruckBay(tk, wx, wz, it);
 
-    const halfW = Math.max(0.7, (tk.bedW || 4.2) * 0.5 - 0.55);
-    const halfD = Math.max(0.8, (tk.bedD || 4.6) * 0.5 - 0.55);
-    let lx = THREE.MathUtils.clamp(local.lx, -halfW, halfW);
-    let lz = THREE.MathUtils.clamp(local.lz, -halfD, halfD);
-    let ly = 0.64;
+    let finalLx = plan.lx;
+    let finalLz = plan.lz;
+    let finalTier = plan.aimedTier;
+    const neatPack = plan.aimedTier === 0;
 
-    // Physical packing: nudge away from nearby cargo or stack upward when bed is crowded
-    for (let attempt = 0; attempt < 12; attempt++) {
-      const crowded = this.truckCargoPlacements.some(
-        (pos) => Math.hypot(pos.lx - lx, pos.lz - lz) < 0.72 && Math.abs(pos.ly - ly) < 0.65
+    if (plan.aimedTier >= 2 && plan.openBay && plan.openBay.tier <= 1) {
+      finalLx = plan.openBay.lx;
+      finalLz = plan.openBay.lz;
+      finalTier = plan.openBay.tier;
+    } else if (plan.aimedTier > 0) {
+      // Check if an adjacent free tier-0 bay exists within 0.85m
+      const overlaps = (cx, cz, tier) => this.truckCargoPlacements.some(
+        (p) => p.tier === tier && Math.abs(p.lx - cx) < (p.hw + plan.hw) * 0.85 && Math.abs(p.lz - cz) < (p.hd + plan.hd) * 0.85
       );
-      if (!crowded) break;
-      const angle = (slot * 1.9 + attempt * 1.15);
-      const tryX = THREE.MathUtils.clamp(lx + Math.cos(angle) * 0.78, -halfW, halfW);
-      const tryZ = THREE.MathUtils.clamp(lz + Math.sin(angle) * 0.78, -halfD, halfD);
-      const stillCrowded = this.truckCargoPlacements.some(
-        (pos) => Math.hypot(pos.lx - tryX, pos.lz - tryZ) < 0.72 && Math.abs(pos.ly - ly) < 0.65
-      );
-      if (!stillCrowded) {
-        lx = tryX;
-        lz = tryZ;
-        break;
-      }
-      if (attempt % 3 === 2) {
-        ly += 0.86;
-      } else {
-        lx = tryX;
-        lz = tryZ;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const ang = slot * 1.7 + attempt * (Math.PI / 4);
+        const tx = THREE.MathUtils.clamp(plan.lx + Math.cos(ang) * 0.75, -plan.halfW, plan.halfW);
+        const tz = THREE.MathUtils.clamp(plan.lz + Math.sin(ang) * 0.75, -plan.halfD, plan.halfD);
+        if (!overlaps(tx, tz, 0)) {
+          finalLx = tx;
+          finalLz = tz;
+          finalTier = 0;
+          break;
+        }
       }
     }
 
-    this.truckCargoPlacements.push({ lx, ly, lz });
+    const ly = 0.64 + finalTier * 0.82;
+    this.truckCargoPlacements.push({ lx: finalLx, ly, lz: finalLz, hw: plan.hw, hd: plan.hd, tier: finalTier });
     cargoMount.add(it.mesh);
-    const isOversized = it.type === 'bed' || it.type === 'dining_table' || it.type === 'bookshelf' || it.type === 'piano';
+    const isOversized = it.type === 'bed' || it.type === 'dining_table' || it.type === 'bookshelf' || it.type === 'piano' || it.type === 'cryo_pod';
     it.mesh.scale.setScalar(isOversized ? 0.78 : 0.86);
-    it.mesh.position.set(lx, ly, lz);
+    it.mesh.position.set(finalLx, ly, finalLz);
     const relRot = (it.mesh.rotation?.y || 0) - (tk.rotY || 0);
     it.mesh.rotation.set(0, relRot, 0);
+
+    // Update truck glowing cargo fill capacity strip
+    const stripMat = this.truck?.mesh?.userData?.packStripMat;
+    if (stripMat) {
+      const ratio = this.itemsDelivered / Math.max(1, this.targetItemsCount || 10);
+      stripMat.color.setHex(ratio < 0.45 ? 0x22c55e : (ratio < 0.85 ? 0xfacc15 : 0xf97316));
+    }
+
+    return { neatPack };
   }
 
   toggleGrab(p) {
@@ -2421,7 +2921,7 @@ export class Game3DApp {
       this.clampItemInBounds(it);
       it.mesh.position.set(it.x, it.y, it.z);
       p.bobi.playAnimation('CHR_Base_Drop', 0.08);
-      soundManager.grab();
+      soundManager.drop(!!it.isCarryOnly);
       this.rumblePlayer(p, 0.25, 60);
       return;
     }
@@ -2468,7 +2968,7 @@ export class Game3DApp {
           this.pushNetEvent('coop_pass', { x: p.x, y: p.y + 2.0, z: p.z, text, air: true });
         }
       } else {
-        soundManager.grab();
+        soundManager.grab(!!nearest.isCarryOnly);
         if (nearest.isLiving) {
           soundManager.petSound();
           this.spawnFloatingText('🐾 ÔM ĐƯỢC RỒI!', p.x, p.y + 1.8, p.z, '#fde68a');
@@ -2531,7 +3031,7 @@ export class Game3DApp {
       p.throwPower = 0;
       p.throwCooldown = 0.28;
       p.bobi.playAnimation('CHR_Base_Drop', 0.06);
-      soundManager.grab();
+      soundManager.drop(true);
       this.rumblePlayer(p, 0.28, 70);
       this.spawnFloatingText(t('carry_only_hint'), p.x, p.y + 1.9, p.z, '#fb923c');
       this.emitBurst(it.x, it.y, it.z, 0xfb923c, 8);
@@ -2778,6 +3278,7 @@ export class Game3DApp {
 
     const isCar = hz?.type === 'car';
     if (isCar) soundManager.horn();
+    else if (isPit) soundManager.pitFall();
     else soundManager.bonk();
     this.cameraShake = 0.28;
     this.rumblePlayer(p, 0.6, 130);
@@ -2833,6 +3334,15 @@ export class Game3DApp {
         if (this.triggerDash(player) && asLanClient) {
           this.sendClientActionSafe('dash', player);
         }
+      }
+      if (pad.justSlap) {
+        if (this.triggerSlap(player) && asLanClient) {
+          this.sendClientActionSafe('slap', player);
+        }
+      }
+      if (pad.justPing) {
+        this.triggerPing(player);
+        if (asLanClient) this.sendClientActionSafe('ping', player);
       }
       if (pad.justThrowStart && player.holdingItem) {
         if (player.holdingItem.isCarryOnly) {
@@ -2914,6 +3424,8 @@ export class Game3DApp {
     if (p.throwCooldown > 0) p.throwCooldown -= dt;
     if (p.dashCooldown > 0) p.dashCooldown = Math.max(0, p.dashCooldown - dt);
     if (p.dashHitCooldown > 0) p.dashHitCooldown = Math.max(0, p.dashHitCooldown - dt);
+    if (p.slapCooldown > 0) p.slapCooldown = Math.max(0, p.slapCooldown - dt);
+    if (p.pingCooldown > 0) p.pingCooldown = Math.max(0, p.pingCooldown - dt);
     if (p.catchBoostTimer > 0) p.catchBoostTimer = Math.max(0, p.catchBoostTimer - dt);
     const isDashing = p.dashTimer > 0;
     if (p.dashTimer > 0) p.dashTimer = Math.max(0, p.dashTimer - dt);
@@ -3038,8 +3550,9 @@ export class Game3DApp {
       p.throwPower = Math.min(1.0, p.throwPower + dt * 1.4);
     }
 
-    // Gravity & Vertical Movement
-    p.vy -= 20.0 * dt;
+    // Gravity & Vertical Movement (supports Low-Gravity Sci-Fi Zones!)
+    const gravScale = this.mechanics ? this.mechanics.gravityScaleAt(p.x, p.z, p.y) : 1.0;
+    p.vy -= 20.0 * gravScale * dt;
     p.x += p.vx * dt;
     p.z += p.vz * dt;
     p.y += p.vy * dt;
@@ -3057,6 +3570,7 @@ export class Game3DApp {
       if (!p.isGrounded && p.vy < -5.5) {
         p.squashX = 1.24;
         p.squashY = 0.78;
+        soundManager.land(!!(p.holdingItem && p.holdingItem.isCarryOnly));
         this.spawnPuffSmoke(p.x, floorY + 0.18, p.z, 3, 0.95);
       }
       p.y = floorY;
@@ -3102,8 +3616,15 @@ export class Game3DApp {
     p.bobi.root.position.set(p.x, p.y, p.z);
     p.bobi.root.rotation.y = p.rotY;
 
-    // Drive 3D Animation Clips & cartoon puff smoke footsteps
+    // Drive 3D Animation Clips, cartoon puff smoke footsteps & heavy carry sweat drops
     const speedH = Math.hypot(p.vx, p.vz);
+    if (p.holdingItem && p.holdingItem.isSuperHeavy && speedH > 0.8) {
+      p.sweatTimer = (p.sweatTimer || 0) - dt;
+      if (p.sweatTimer <= 0) {
+        p.sweatTimer = 0.42;
+        this.emitDebris(p.x, p.y + 1.55, p.z, 'sweat', 2);
+      }
+    }
     if (p.isGrounded && speedH > 4.4) {
       p.puffTimer = (p.puffTimer || 0) - dt;
       if (p.puffTimer <= 0) {
@@ -3148,7 +3669,8 @@ export class Game3DApp {
         it.vz += wind.fz * dt;
       }
 
-      it.vy -= 18.0 * dt;
+      const gravScale = this.mechanics ? this.mechanics.gravityScaleAt(it.x, it.z, it.y) : 1.0;
+      it.vy -= 18.0 * gravScale * dt;
       it.x += it.vx * dt;
       it.y += it.vy * dt;
       it.z += it.vz * dt;
@@ -3165,10 +3687,13 @@ export class Game3DApp {
           this.cameraShake = 0.35;
           soundManager.glassShatter();
           this.rumbleAllActive(0.5, 110);
-          this.emitBurst(hitObs.x, 1.4, hitObs.z, 0x67e8f9, 26);
+          this.emitDebris(hitObs.x, 1.4, hitObs.z, 'glass', 18);
+          this.emitShockRing(hitObs.x, 0.25, hitObs.z, 0x67e8f9, 3.0);
           this.spawnFloatingText('💥 VỠ KÍNH! ĐƯỜNG THÔNG!', hitObs.x, 2.2, hitObs.z, '#22d3ee');
           this.ui.addFeedPill('<span>🪟 Vỡ kính!</span><b style="color:#0284c7;">Mở lối</b>', 'glass');
         }
+      } else if (hitObs && Math.hypot(it.vx, it.vz) > 4.2) {
+        this.emitDebris(it.x, it.y + 0.25, it.z, 'wood', 6);
       }
 
       // 2-Player Co-op Pass / Airborne Catch!
@@ -3224,17 +3749,38 @@ export class Game3DApp {
         }
       }
 
-      // Check Truck Bed Delivery (Combo Chain + Cargo Stack + Suspension Bounce)
+      // Check Truck Bed Delivery (Spatial Cargo Packing + Overflow Deflect + Combo Chain + Suspension Bounce)
       const tk = def.truck;
       if (isInsideTruckBed(tk, it.x, it.z) && it.y >= 0.0 && it.y <= 1.45) {
+        // If fast-thrown onto an already Tier 2 corner while open Tier 0/1 bays exist, deflect cleanly toward open bay!
+        const horizSpeed = Math.hypot(it.vx, it.vz);
+        if (horizSpeed > 2.6 && !it.packDeflected) {
+          const check = this.evaluateTruckBay(tk, it.x, it.z, it);
+          if (check.aimedTier >= 2 && check.openBay && check.openBay.tier <= 1) {
+            it.packDeflected = true;
+            const c = Math.cos(tk.rotY || 0);
+            const s = Math.sin(tk.rotY || 0);
+            const targetWx = tk.x + (check.openBay.lx * c + check.openBay.lz * s);
+            const targetWz = tk.z + (-check.openBay.lx * s + check.openBay.lz * c);
+            it.vy = 3.6;
+            it.vx = THREE.MathUtils.clamp((targetWx - it.x) * 2.2, -5.5, 5.5);
+            it.vz = THREE.MathUtils.clamp((targetWz - it.z) * 2.2, -5.5, 5.5);
+            soundManager.bonk();
+            this.emitShockRing(it.x, 0.9, it.z, 0xfacc15, 2.0);
+            this.spawnFloatingText(t('mech_pack_crowded'), it.x, 2.3, it.z, '#facc15');
+            return;
+          }
+        }
+
         it.isDelivered = true;
         it.vx = it.vy = it.vz = it.vrot = 0;
-        this.mountDeliveredItemInTruck(it, it.x, it.z);
+        const { neatPack } = this.mountDeliveredItemInTruck(it, it.x, it.z);
 
         this.deliveryCombo = this.comboTimer > 0 ? this.deliveryCombo + 1 : 1;
         this.comboTimer = 5.5;
         const comboBonus = this.deliveryCombo >= 2 ? Math.min(4, this.deliveryCombo - 1) * 350000 : 0;
-        const totalGain = it.value + comboBonus;
+        const neatBonus = neatPack ? 150000 : 0;
+        const totalGain = it.value + comboBonus + neatBonus;
 
         this.itemsDelivered++;
         this.score += totalGain;
@@ -3248,12 +3794,17 @@ export class Game3DApp {
         } else {
           soundManager.deliver(this.deliveryCombo);
         }
+        if (neatBonus > 0) soundManager.packBonus();
 
         this.rumbleAllActive(0.35, 90);
-        this.emitBurst(it.x, 1.1, it.z, comboBonus > 0 ? 0xfacc15 : 0x22c55e, comboBonus > 0 ? 28 : 22);
+        this.emitDebris(it.x, 1.35, it.z, 'confetti', comboBonus > 0 ? 18 : 12);
+        this.emitShockRing(it.x, 0.72, it.z, neatBonus > 0 ? 0x22c55e : 0xfacc15, 2.8);
         if (comboBonus > 0) {
-          this.spawnFloatingText(`🔥 x${this.deliveryCombo}! +${totalGain.toLocaleString()}đ`, it.x, 2.35, it.z, '#f59e0b');
+          this.spawnFloatingText(`🔥 x${this.deliveryCombo}! +${totalGain.toLocaleString()}đ`, it.x, 2.4, it.z, '#f59e0b');
           this.ui.addFeedPill(`<span>🔥 x${this.deliveryCombo} ${it.name}</span><b>+${totalGain.toLocaleString()}đ</b>`, 'bounce');
+        } else if (neatBonus > 0) {
+          this.spawnFloatingText(`${t('mech_pack_neat')} +${totalGain.toLocaleString()}đ`, it.x, 2.3, it.z, '#22c55e');
+          this.ui.addFeedPill(`<span>✨ ${it.name}</span><b style="color:#15803d;">+${totalGain.toLocaleString()}đ</b>`);
         } else {
           this.spawnFloatingText(`+${it.value.toLocaleString()}đ`, it.x, 2.2, it.z, '#16a34a');
           this.ui.addFeedPill(`<span>✓ ${it.name}</span><b>+${it.value.toLocaleString()}đ</b>`);
@@ -3265,7 +3816,7 @@ export class Game3DApp {
         return;
       }
 
-      // Check Moving Road Traffic Impact on Loose Item (Street Cars only — NPC patrols never penalize loose items)
+      // Check Moving Road Traffic & Security Laser Impact on Loose Items
       if (this.mechanics && it.hazardCooldown <= 0) {
         const hitHz = this.mechanics.hazardHitting(it, it.radius, { carsOnly: true });
         if (hitHz) {
@@ -3276,6 +3827,22 @@ export class Game3DApp {
             feedLabel: '🚗 Xe tông đồ',
             burstColor: 0xef4444,
             penaltyRatio: 0.25,
+            countHazard: true,
+            countFragile: !!it.isFragile
+          });
+          return;
+        }
+        const hitLaser = this.mechanics.laserHitting(it, it.radius);
+        if (hitLaser) {
+          it.hazardCooldown = 1.2;
+          soundManager.laserZap();
+          this.emitDebris(it.x, it.y + 0.4, it.z, 'electric', 14);
+          this.emitShockRing(it.x, Math.max(0.15, it.y + 0.1), it.z, 0xf43f5e, 2.4);
+          this.respawnItemSafely(it, {
+            toastText: t('mech_laser_zap'),
+            feedLabel: '⚡ Dính Laser',
+            burstColor: 0xf43f5e,
+            penaltyRatio: 0.2,
             countHazard: true,
             countFragile: !!it.isFragile
           });
@@ -3326,7 +3893,9 @@ export class Game3DApp {
           this.cameraShake = 0.35;
           soundManager.shatter();
           this.rumbleAllActive(0.6, 130);
-          this.emitBurst(it.x, floorY + 0.3, it.z, 0xef4444, 24);
+          const shatterKind = (it.type === 'crystal' || it.type === 'aquarium' || it.type === 'tv' || it.type === 'hologram' || it.type === 'satellite') ? 'glass' : 'ceramic';
+          this.emitDebris(it.x, floorY + 0.35, it.z, shatterKind, 20);
+          this.emitShockRing(it.x, floorY + 0.1, it.z, 0xef4444, 2.8);
 
           if (this.unlimitedTime) {
             // In Unlimited Time (Chill) mode, respawn fragile item back in house so level always completes
@@ -3426,15 +3995,17 @@ export class Game3DApp {
   updateTrajectoryVisual() {
     const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
     const activeP = isLanClient ? this.players[1] : this.players[0];
-    if (!activeP || !activeP.chargingThrow || !activeP.holdingItem || activeP.holdingItem.isCarryOnly || this.gameState !== 'PLAYING') {
+    if (!activeP || !activeP.holdingItem || activeP.holdingItem.isCarryOnly || this.gameState !== 'PLAYING') {
       this.trajectoryDots.forEach(d => d.visible = false);
+      if (this.aimLandingRing) this.aimLandingRing.visible = false;
       return;
     }
 
     const it = activeP.holdingItem;
+    const isAimingActive = !!(activeP.chargingThrow || this.pointerAiming);
     let dirX = Math.sin(activeP.rotY);
     let dirZ = Math.cos(activeP.rotY);
-    let power = 0.55 + activeP.throwPower * 0.75;
+    let power = isAimingActive ? (0.55 + activeP.throwPower * 0.75) : 0.62;
 
     if (this.pointerAiming) {
       const dx = this.aimWorldPoint.x - activeP.x;
@@ -3452,19 +4023,90 @@ export class Game3DApp {
     const modThrowMult = this.selectedModifier === 'turbo' ? 1.2 : 1.0;
     const weightMult = it.isSuperHeavy ? 0.68 : (it.isHeavy ? 0.84 : 1.0);
     const mult = power * weightMult * perk.throwMult * catchBoost * modThrowMult;
+
+    let sx = activeP.x + Math.sin(activeP.rotY) * 0.6;
+    let sy = activeP.y + 1.35;
+    let sz = activeP.z + Math.cos(activeP.rotY) * 0.6;
     const vx = dirX * 11.5 * mult;
     const vz = dirZ * 11.5 * mult;
-    const vy = 6.2 * mult;
+    let vy = 6.2 * mult;
+
+    const def = LEVELS_3D[this.currentLevel] || LEVELS_3D[1];
+    const obstacles = [
+      ...(def.walls || []),
+      ...this.windows.filter(w => !w.isBroken),
+      ...(this.mechanics ? this.mechanics.getObstacles() : [])
+    ];
+
+    let outcomeColor = 0xfef08a; // default floor yellow
+    let landed = false;
+    let landX = sx, landY = sy, landZ = sz;
+    const dtStep = 0.065;
 
     for (let i = 0; i < this.trajectoryDots.length; i++) {
-      const t = (i + 1) * 0.08;
       const dot = this.trajectoryDots[i];
-      dot.position.set(
-        activeP.x + vx * t,
-        Math.max(0.08, activeP.y + 1.35 + vy * t - 0.5 * 18.0 * t * t),
-        activeP.z + vz * t
-      );
+      if (landed) {
+        dot.visible = false;
+        continue;
+      }
+      const gScale = this.mechanics ? this.mechanics.gravityScaleAt(sx, sz, sy) : 1.0;
+      vy -= 18.0 * gScale * dtStep;
+      sx += vx * dtStep;
+      sy += vy * dtStep;
+      sz += vz * dtStep;
+
+      // Check Truck Bed Swish
+      if (def.truck && isInsideTruckBed(def.truck, sx, sz) && sy <= 1.35 && sy >= 0.0) {
+        outcomeColor = 0x22c55e;
+        landX = sx;
+        landY = 0.72;
+        landZ = sz;
+        landed = true;
+      } else {
+        // Check glass windows & solid walls
+        for (const obs of obstacles) {
+          const obsTop = obs.y + (obs.h || 3.0) / 2;
+          if (sy < obsTop && Math.abs(sx - obs.x) < obs.w / 2 + 0.35 && Math.abs(sz - obs.z) < obs.d / 2 + 0.35) {
+            outcomeColor = obs.id ? 0x38bdf8 : 0xfb923c;
+            landX = sx;
+            landY = Math.max(0.15, sy);
+            landZ = sz;
+            landed = true;
+            break;
+          }
+        }
+        if (!landed) {
+          const floorY = this.getFloorHeightAt(sx, sz, sy);
+          if (sy <= floorY && floorY > -1.0) {
+            landX = sx;
+            landY = floorY + 0.08;
+            landZ = sz;
+            landed = true;
+          }
+        }
+      }
+
+      dot.position.set(sx, Math.max(0.10, sy), sz);
+      dot.scale.setScalar(isAimingActive ? (1.05 - i * 0.025) : 0.74);
       dot.visible = true;
+      if (!landed) {
+        landX = sx;
+        landY = Math.max(0.10, this.getFloorHeightAt(sx, sz, sy) + 0.08);
+        landZ = sz;
+      }
+    }
+
+    if (this.trajectoryDotMat) {
+      this.trajectoryDotMat.color.setHex(outcomeColor);
+      this.trajectoryDotMat.opacity = isAimingActive ? 0.92 : 0.44;
+    }
+    if (this.aimLandingRing && this.aimLandingMat) {
+      this.aimLandingMat.color.setHex(outcomeColor);
+      this.aimLandingMat.opacity = isAimingActive ? 0.92 : 0.50;
+      this.aimLandingRing.position.set(landX, landY, landZ);
+      const pulse = isAimingActive ? (1.0 + Math.sin(performance.now() * 0.012) * 0.14) : 0.85;
+      this.aimLandingRing.scale.setScalar(pulse);
+      this.aimLandingRing.visible = true;
     }
   }
 
@@ -3512,16 +4154,77 @@ export class Game3DApp {
     }
   }
 
+  emitDebris(x, y, z, materialType = 'wood', count = 12) {
+    const confettiPalette = [0xfef08a, 0x38bdf8, 0xf472b6, 0x4ade80, 0xfb923c];
+    const matMap = {
+      glass: { geo: this.sharedShardGeo, color: 0x67e8f9, spin: 12 },
+      wood: { geo: this.sharedWoodGeo, color: 0xd97706, spin: 9 },
+      ceramic: { geo: this.sharedShardGeo, color: 0xfef3c7, spin: 10 },
+      electric: { geo: this.sharedParticleGeo, color: 0x22d3ee, spin: 14 },
+      sweat: { geo: this.sharedPuffGeo, color: 0x38bdf8, spin: 2 }
+    };
+    for (let i = 0; i < count; i++) {
+      const cfg = matMap[materialType] || matMap.wood;
+      const colorHex = materialType === 'confetti' ? confettiPalette[i % confettiPalette.length] : cfg.color;
+      let mat = this.particleMatCache.get(colorHex);
+      if (!mat) {
+        mat = new THREE.MeshBasicMaterial({ color: colorHex });
+        this.particleMatCache.set(colorHex, mat);
+      }
+      const m = new THREE.Mesh(materialType === 'confetti' ? this.sharedWoodGeo : cfg.geo, mat);
+      m.position.set(x, y, z);
+      this.levelGroup.add(m);
+      const isSweat = materialType === 'sweat';
+      const isConfetti = materialType === 'confetti';
+      this.particles.push({
+        mesh: m,
+        isConfetti,
+        spinSpeed: cfg.spin,
+        vx: (Math.random() - 0.5) * (isSweat ? 2.4 : 7.5),
+        vy: isSweat ? (1.8 + Math.random() * 1.4) : (isConfetti ? 4.5 + Math.random() * 4.5 : 2.5 + Math.random() * 5.2),
+        vz: (Math.random() - 0.5) * (isSweat ? 2.4 : 7.5),
+        life: isSweat ? 0.42 : (isConfetti ? 1.1 + Math.random() * 0.4 : 0.65 + Math.random() * 0.35)
+      });
+    }
+  }
+
+  emitShockRing(x, y, z, colorHex = 0xfacc15, maxScale = 2.6) {
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: colorHex,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+      depthTest: false
+    });
+    const m = new THREE.Mesh(this.sharedRingGeo, ringMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, y, z);
+    this.levelGroup.add(m);
+    this.particles.push({
+      mesh: m,
+      isShockRing: true,
+      ringMat,
+      maxScale,
+      life: 0.36,
+      maxLife: 0.36
+    });
+  }
+
   updateParticles(dt) {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const pt = this.particles[i];
       pt.life -= dt;
       if (pt.life <= 0) {
         this.levelGroup.remove(pt.mesh);
+        if (pt.isShockRing && pt.ringMat) pt.ringMat.dispose();
         this.particles.splice(i, 1);
         continue;
       }
-      if (pt.isPuff) {
+      if (pt.isShockRing) {
+        const p = 1 - Math.max(0, pt.life / (pt.maxLife || 0.36));
+        pt.mesh.scale.setScalar(0.45 + p * (pt.maxScale || 2.5));
+        if (pt.ringMat) pt.ringMat.opacity = (1 - p) * 0.85;
+      } else if (pt.isPuff) {
         pt.mesh.position.x += pt.vx * dt;
         pt.mesh.position.y += pt.vy * dt;
         pt.mesh.position.z += pt.vz * dt;
@@ -3531,13 +4234,18 @@ export class Game3DApp {
         const puffScale = pt.baseScale * (0.4 + Math.sin(tNorm * Math.PI) * 1.15);
         pt.mesh.scale.setScalar(Math.max(0.05, puffScale));
       } else {
-        pt.vy -= 14 * dt;
+        pt.vy -= (pt.isConfetti ? 6.5 : 14.5) * dt;
+        if (pt.isConfetti) {
+          pt.vx *= Math.exp(-1.5 * dt);
+          pt.vz *= Math.exp(-1.5 * dt);
+        }
         pt.mesh.position.x += pt.vx * dt;
         pt.mesh.position.y += pt.vy * dt;
         pt.mesh.position.z += pt.vz * dt;
-        pt.mesh.rotation.x += 6 * dt;
-        pt.mesh.rotation.y += 6 * dt;
-        pt.mesh.scale.setScalar(Math.max(0.05, pt.life));
+        const sp = pt.spinSpeed || 6;
+        pt.mesh.rotation.x += sp * dt;
+        pt.mesh.rotation.y += sp * dt;
+        pt.mesh.scale.setScalar(Math.max(0.06, Math.min(1.0, pt.life * 1.3)));
       }
     }
   }
@@ -3644,6 +4352,20 @@ export class Game3DApp {
       const penText = ev.penalty ? ` -${ev.penalty.toLocaleString()}đ` : '';
       this.spawnFloatingText(`${t('mech_item_respawn')}${penText}`, ev.rx, ev.ry, ev.rz, '#fb923c');
       this.ui.addFeedPill(`<span>♻️ ${ev.name}</span><b style="color:#c2410c;">-${(ev.penalty || 0).toLocaleString()}đ</b>`, 'broke');
+    } else if (ev.kind === 'slap') {
+      soundManager.slap();
+      this.emitShockRing(ev.x, Math.max(0.15, ev.y - 0.6), ev.z, 0xf472b6, 1.9);
+    } else if (ev.kind === 'ping') {
+      soundManager.ping();
+      this.spawnPingBeacon(ev.x, ev.y, ev.z, ev.color || 0x38bdf8, ev.text || '', ev.css || '#38bdf8');
+    } else if (ev.kind === 'laser_zap') {
+      soundManager.laserZap();
+      this.emitDebris(ev.x, ev.y + 0.5, ev.z, 'electric', 14);
+      this.emitShockRing(ev.x, Math.max(0.15, ev.y), ev.z, 0xf43f5e, 2.5);
+      this.spawnFloatingText(t('mech_laser_zap'), ev.x, ev.y + 1.8, ev.z, '#f43f5e');
+    } else if (ev.kind === 'guard_alert') {
+      soundManager.alertGuard();
+      this.spawnFloatingText(t('mech_guard_alert'), ev.x, ev.y + 2.0, ev.z, '#ef4444');
     }
   }
 
@@ -3805,7 +4527,8 @@ export class Game3DApp {
     const changedSwitches = this.mechanics.update(dt, {
       authoritative: !isLanClient,
       players: this.players,
-      items: this.items
+      items: this.items,
+      rage: this.landlordRage
     });
 
     // Ride vertical delta smoothly on moving elevators
@@ -3834,7 +4557,15 @@ export class Game3DApp {
       if (changedSwitches.length > 0) {
         soundManager.switchToggle(changedSwitches[0].active);
       }
-      // Car warning horn approaching center crosswalk
+      // Reactive Guard / Drone alert feedback
+      if (this.mechanics.lastAlerts && this.mechanics.lastAlerts.length > 0) {
+        this.mechanics.lastAlerts.forEach((al) => {
+          soundManager.alertGuard();
+          this.spawnFloatingText(t('mech_guard_alert'), al.x, 2.1, al.z, '#ef4444');
+          this.pushNetEvent('guard_alert', { x: al.x, y: 0.2, z: al.z });
+        });
+      }
+      // Car warning horn + mischievous Robot sweeping nearby loose items
       for (const h of this.mechanics.hazards) {
         if (h.type === 'car' && !h.stopped && h.hornCd <= 0) {
           const approaching = h.axis === 'x'
@@ -3845,12 +4576,38 @@ export class Game3DApp {
             soundManager.horn();
           }
         }
+        if (h.type === 'patrol' && h.kind === 'robot' && (h.stunTimer || 0) <= 0) {
+          for (const it of this.items) {
+            if (it.isHeld || it.isDelivered || it.isBroken || it.isCarryOnly || (it.hazardCooldown || 0) > 0) continue;
+            const d = Math.hypot(it.x - h.x, it.z - h.z);
+            if (d < 0.92 && Math.abs(it.y) < 0.8) {
+              it.hazardCooldown = 1.4;
+              const ang = Math.atan2(it.z - h.z, it.x - h.x);
+              it.vx += Math.cos(ang) * 3.6;
+              it.vz += Math.sin(ang) * 3.6;
+              it.vy = 2.0;
+              break;
+            }
+          }
+        }
       }
-      // Player hazard collisions (Cars & Patrollers)
+      // Player hazard & Security Laser collisions
       this.players.forEach((p) => {
         if (!p || p.stunTimer > 0) return;
         const hz = this.mechanics.hazardHitting(p, p.radius);
-        if (hz) this.applyPlayerHazardHit(p, hz, false);
+        if (hz) {
+          this.applyPlayerHazardHit(p, hz, false);
+          return;
+        }
+        const hitLaser = this.mechanics.laserHitting(p, p.radius);
+        if (hitLaser) {
+          soundManager.laserZap();
+          this.emitDebris(p.x, p.y + 0.7, p.z, 'electric', 14);
+          this.emitShockRing(p.x, p.y + 0.15, p.z, 0xf43f5e, 2.5);
+          this.applyPlayerHazardHit(p, { type: 'laser', x: hitLaser.x1, z: hitLaser.z1 }, false);
+          this.spawnFloatingText(t('mech_laser_zap'), p.x, p.y + 2.0, p.z, '#f43f5e');
+          this.pushNetEvent('laser_zap', { x: p.x, y: p.y + 0.2, z: p.z });
+        }
       });
     }
 
@@ -3941,6 +4698,7 @@ export class Game3DApp {
           }
         }
         this.updateParticles(dt);
+        this.updatePingBeacons(dt);
 
         // Update HUD at ~10 Hz
         if (now - this.lastHudSyncTime >= 100) {
