@@ -1,0 +1,91 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "Moving Chaos 3D Generator"
+  },
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0,
+  "nodes": [
+    {
+      "name": "CHR_Bobi_Base",
+      "translation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "Mat_YellowBean",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          0.647,
+          0.008,
+          1.0
+        ],
+        "roughnessFactor": 0.45,
+        "metallicFactor": 0.0
+      }
+    },
+    {
+      "name": "Mat_DenimBlue",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.216,
+          0.259,
+          0.98,
+          1.0
+        ],
+        "roughnessFactor": 0.55,
+        "metallicFactor": 0.0
+      }
+    },
+    {
+      "name": "Mat_BandanaRed",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          0.278,
+          0.341,
+          1.0
+        ],
+        "roughnessFactor": 0.4,
+        "metallicFactor": 0.0
+      }
+    },
+    {
+      "name": "Mat_WhiteGloves",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.95,
+          0.95,
+          0.95,
+          1.0
+        ],
+        "roughnessFactor": 0.6,
+        "metallicFactor": 0.0
+      }
+    },
+    {
+      "name": "Mat_BootsCharcoal",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.341,
+          0.376,
+          0.435,
+          1.0
+        ],
+        "roughnessFactor": 0.6,
+        "metallicFactor": 0.0
+      }
+    }
+  ]
+}

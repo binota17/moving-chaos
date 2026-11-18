@@ -1,0 +1,7 @@
+# Modular Part: Chef Apron
+# Skinned to: Spine & Hips joints
+v -0.22 -0.34 0.20
+v 0.22 -0.34 0.20
+v 0.25 -0.34 -0.25
+v -0.25 -0.34 -0.25
+f 1 2 3 4

@@ -1,0 +1,63 @@
+newmtl Mat_YellowBean
+Kd 1.000 0.647 0.008
+Ka 0.15 0.15 0.15
+Ks 0.25 0.25 0.25
+Ns 32.0
+d 1.0
+
+newmtl Mat_DenimBlue
+Kd 0.216 0.259 0.980
+Ka 0.15 0.15 0.15
+Ks 0.25 0.25 0.25
+Ns 32.0
+d 1.0
+
+newmtl Mat_BandanaRed
+Kd 1.000 0.278 0.341
+Ka 0.15 0.15 0.15
+Ks 0.25 0.25 0.25
+Ns 32.0
+d 1.0
+
+newmtl Mat_WhiteGloves
+Kd 0.960 0.960 0.980
+Ka 0.15 0.15 0.15
+Ks 0.25 0.25 0.25
+Ns 32.0
+d 1.0
+
+newmtl Mat_BootsCharcoal
+Kd 0.240 0.270 0.330
+Ka 0.15 0.15 0.15
+Ks 0.25 0.25 0.25
+Ns 32.0
+d 1.0
+
+newmtl Mat_EyesBlack
+Kd 0.040 0.040 0.050
+Ka 0.15 0.15 0.15
+Ks 0.25 0.25 0.25
+Ns 32.0
+d 1.0
+
+newmtl Mat_EyeWhite
+Kd 1.000 1.000 1.000
+Ka 0.15 0.15 0.15
+Ks 0.25 0.25 0.25
+Ns 32.0
+d 1.0
+
+newmtl Mat_CheeksPink
+Kd 1.000 0.420 0.506
+Ka 0.15 0.15 0.15
+Ks 0.25 0.25 0.25
+Ns 32.0
+d 1.0
+
+newmtl Mat_ButtonGold
+Kd 1.000 0.840 0.160
+Ka 0.15 0.15 0.15
+Ks 0.25 0.25 0.25
+Ns 32.0
+d 1.0
+
