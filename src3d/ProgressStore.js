@@ -13,8 +13,25 @@ const DEFAULT_SETTINGS = {
   sfxEnabled: true,
   rumbleEnabled: true,
   highQuality: null, // null = auto detect device
-  guideSeen: false
+  guideSeen: false,
+  selectedSkin: 'classic',
+  modifier: 'normal'
 };
+
+export const BOBI_SKINS = [
+  { id: 'classic', starsRequired: 0, tintHex: null, swatch: '#ffe066', labelVi: 'Vàng Gốc', labelEn: 'Classic' },
+  { id: 'bubblegum', starsRequired: 4, tintHex: 0xfda4af, swatch: '#fda4af', labelVi: 'Kẹo Hồng', labelEn: 'Bubblegum' },
+  { id: 'mint', starsRequired: 9, tintHex: 0x6ee7b7, swatch: '#6ee7b7', labelVi: 'Bạc Hà', labelEn: 'Mint' },
+  { id: 'royal', starsRequired: 15, tintHex: 0xfef08a, swatch: '#facc15', labelVi: 'Hoàng Kim', labelEn: 'Royal Gold' },
+  { id: 'galaxy', starsRequired: 22, tintHex: 0xc084fc, swatch: '#c084fc', labelVi: 'Vũ Trụ', labelEn: 'Nebula' }
+];
+
+export const MATCH_MODIFIERS = ['normal', 'turbo', 'bouncy', 'chill'];
+
+export function isSkinUnlocked(skinId, totalStars = 0) {
+  const sk = BOBI_SKINS.find(s => s.id === skinId);
+  return sk ? totalStars >= sk.starsRequired : true;
+}
 
 function safeReadJson(key, fallback) {
   try {
@@ -37,6 +54,8 @@ function safeWriteJson(key, value) {
 
 export function loadSettings() {
   const saved = safeReadJson(SETTINGS_KEY, DEFAULT_SETTINGS);
+  const validSkin = BOBI_SKINS.some(s => s.id === saved.selectedSkin) ? saved.selectedSkin : 'classic';
+  const validMod = MATCH_MODIFIERS.includes(saved.modifier) ? saved.modifier : 'normal';
   return {
     lang: saved.lang === 'en' ? 'en' : 'vi',
     bgmVolume: typeof saved.bgmVolume === 'number' ? Math.max(0, Math.min(1, saved.bgmVolume)) : DEFAULT_SETTINGS.bgmVolume,
@@ -45,7 +64,9 @@ export function loadSettings() {
     sfxEnabled: typeof saved.sfxEnabled === 'boolean' ? saved.sfxEnabled : DEFAULT_SETTINGS.sfxEnabled,
     rumbleEnabled: typeof saved.rumbleEnabled === 'boolean' ? saved.rumbleEnabled : DEFAULT_SETTINGS.rumbleEnabled,
     highQuality: typeof saved.highQuality === 'boolean' ? saved.highQuality : null,
-    guideSeen: typeof saved.guideSeen === 'boolean' ? saved.guideSeen : false
+    guideSeen: typeof saved.guideSeen === 'boolean' ? saved.guideSeen : false,
+    selectedSkin: validSkin,
+    modifier: validMod
   };
 }
 
@@ -131,12 +152,16 @@ export class ProgressStore {
     };
   }
 
-  getTotalStars(levelIds = [1, 2, 3, 4, 5, 6]) {
+  getTotalStars(levelIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
     let total = 0;
     for (const id of levelIds) {
       total += this.getLevelRecord(id).bestStars;
     }
     return total;
+  }
+
+  isSkinUnlocked(skinId, totalStars) {
+    return isSkinUnlocked(skinId, totalStars);
   }
 
   recordMatch(levelId, { completed, stars, score, elapsedSeconds, bonusPassed }) {

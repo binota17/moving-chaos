@@ -69,13 +69,19 @@
       cursor: crosshair;
     }
 
-    /* Hide gameplay HUD layers cleanly while on Start Menu or Game Over */
+    /* Hide gameplay HUD layers cleanly while on Start Menu, Overworld, or Game Over */
     #game-container.is-menu .hud-top,
     #game-container.is-menu .hud-bottom,
     #game-container.is-menu .bonus-hud-pill,
     #game-container.is-menu .combo-hud-pill,
     #game-container.is-menu .delivery-feed,
     #game-container.is-menu .touch-joystick-zone,
+    #game-container.is-overworld .hud-top,
+    #game-container.is-overworld .hud-bottom,
+    #game-container.is-overworld .bonus-hud-pill,
+    #game-container.is-overworld .combo-hud-pill,
+    #game-container.is-overworld .delivery-feed,
+    #game-container.is-overworld .touch-joystick-zone,
     #game-container.is-gameover .hud-top,
     #game-container.is-gameover .hud-bottom,
     #game-container.is-gameover .bonus-hud-pill,
@@ -161,6 +167,8 @@
     }
     .p1-pill { background: #ffedd5; color: #9a3412; }
     .p2-pill { background: #e0f2fe; color: #075985; }
+    .p3-pill { background: #dcfce7; color: #166534; }
+    .p4-pill { background: #f3e8ff; color: #6b21a8; }
 
     .rage-card { display: flex; align-items: center; gap: 7px; padding: 6px 11px; }
     .rage-bar-wrap {
@@ -597,10 +605,10 @@
     }
     .variant-card.selected .variant-perk { color: var(--ink); }
 
-    /* Mode Segmented Switcher */
+    /* Mode Segmented Switcher (1P / 2P / 3P / 4P / LAN) */
     .mode-selector {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 4px;
       background: var(--paper-well);
       padding: 4px;
@@ -611,11 +619,11 @@
       background: transparent;
       border: 2px solid transparent;
       color: var(--ink-muted);
-      padding: 6px 4px;
+      padding: 6px 2px;
       border-radius: 9px;
       cursor: pointer;
       font-family: var(--font-display);
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 700;
       text-align: center;
       white-space: nowrap;
@@ -626,6 +634,83 @@
       background: var(--paper-white);
       color: var(--ink);
       border-color: var(--ink);
+      box-shadow: 0 2px 0 var(--ink);
+    }
+
+    /* Bobi Skin Swatches (Unlocked by Total Stars) & Match Modifiers */
+    .dock-mini-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .dock-mini-label {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: var(--ink-muted);
+      letter-spacing: 0.2px;
+    }
+    .skin-picker-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+    }
+    .skin-swatch {
+      position: relative;
+      height: 30px;
+      border-radius: 9px;
+      border: 2px solid rgba(30, 36, 44, 0.35);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 900;
+      color: var(--ink);
+      transition: transform 0.12s, border-color 0.12s;
+    }
+    .skin-swatch:hover { transform: translateY(-1px); border-color: var(--ink); }
+    .skin-swatch.selected {
+      border: 2.5px solid var(--ink);
+      box-shadow: 0 2px 0 var(--ink);
+      transform: translateY(-1px);
+    }
+    .skin-swatch.locked {
+      opacity: 0.55;
+      filter: grayscale(0.35);
+    }
+    .skin-lock-tag {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--ink);
+      border-radius: 6px;
+      padding: 0 3px;
+      font-size: 9px;
+      line-height: 1.3;
+    }
+    .mod-pills-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+    .mod-pill {
+      background: var(--paper-white);
+      border: 2px solid rgba(30, 36, 44, 0.24);
+      color: var(--ink-muted);
+      padding: 5px 3px;
+      border-radius: 9px;
+      font-size: 10.5px;
+      font-weight: 800;
+      text-align: center;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: all 0.14s;
+    }
+    .mod-pill:hover { border-color: var(--ink); color: var(--ink); }
+    .mod-pill.active {
+      background: var(--sunny);
+      border: 2px solid var(--ink);
+      color: var(--ink);
       box-shadow: 0 2px 0 var(--ink);
     }
 
@@ -887,6 +972,80 @@
     .level-card[data-level="4"] { --lvl-color: #f97316; }
     .level-card[data-level="5"] { --lvl-color: #eab308; }
     .level-card[data-level="6"] { --lvl-color: #0284c7; }
+    .level-card[data-level="7"] { --lvl-color: #10b981; }
+    .level-card[data-level="8"] { --lvl-color: #ec4899; }
+    .level-card[data-level="9"] { --lvl-color: #6366f1; }
+    .level-card[data-level="10"] { --lvl-color: #0ea5e9; }
+    .level-card[data-level="11"] { --lvl-color: #475569; }
+    .level-card[data-level="12"] { --lvl-color: #f59e0b; }
+
+    /* 3D Overworld Town Hub HUD */
+    #overworld-hud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 20px 18px;
+      z-index: 18;
+    }
+    .overworld-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .overworld-bottom-wrap {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+    .overworld-card {
+      pointer-events: auto;
+      background: var(--paper-bg);
+      border: 3px solid var(--ink);
+      border-radius: 18px;
+      padding: 12px 18px;
+      box-shadow: 0 6px 0 var(--ink), 0 18px 34px rgba(30, 36, 44, 0.25);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      max-width: 680px;
+      width: 100%;
+    }
+    .overworld-info { flex: 1; min-width: 0; text-align: left; }
+    .overworld-chapter {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--ink-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .overworld-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 2px 0;
+    }
+    .overworld-title-row h3 {
+      font-family: var(--font-display);
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .overworld-hint {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--emerald);
+      margin-top: 2px;
+    }
+    .overworld-card .btn-main {
+      width: auto;
+      flex-shrink: 0;
+      font-size: 15px;
+      padding: 11px 18px;
+    }
 
     .level-card:hover {
       transform: translateY(-2px);
@@ -1110,6 +1269,16 @@
           <span>P2:</span>
           <span id="p2-status">Rảnh</span>
         </div>
+
+        <div class="player-hud-pill p3-pill" id="p3-hud" style="display:none;">
+          <span>P3:</span>
+          <span id="p3-status">Rảnh</span>
+        </div>
+
+        <div class="player-hud-pill p4-pill" id="p4-hud" style="display:none;">
+          <span>P4:</span>
+          <span id="p4-status">Rảnh</span>
+        </div>
       </div>
 
       <div class="hud-right-group">
@@ -1260,9 +1429,26 @@
           </div>
 
           <div class="mode-selector">
-            <div class="mode-tab active" data-mode="SOLO" id="mode-tab-solo">👤 1P</div>
-            <div class="mode-tab" data-mode="LOCAL_2P" id="mode-tab-local2p">👥 2P</div>
-            <div class="mode-tab" data-mode="LAN_COOP" id="mode-tab-lan">🌐 LAN</div>
+            <div class="mode-tab active" data-mode="SOLO" id="mode-tab-solo">1P</div>
+            <div class="mode-tab" data-mode="LOCAL_2P" id="mode-tab-local2p">2P</div>
+            <div class="mode-tab" data-mode="LOCAL_3P" id="mode-tab-local3p">3P</div>
+            <div class="mode-tab" data-mode="LOCAL_4P" id="mode-tab-local4p">4P</div>
+            <div class="mode-tab" data-mode="LAN_COOP" id="mode-tab-lan">LAN</div>
+          </div>
+
+          <div class="dock-mini-row">
+            <div class="dock-mini-label" id="skin-picker-label">🎨 Màu Bobi</div>
+            <div class="skin-picker-row" id="skin-picker-row"></div>
+          </div>
+
+          <div class="dock-mini-row">
+            <div class="dock-mini-label" id="mod-picker-label">⚡ Chế độ</div>
+            <div class="mod-pills-row" id="mod-pills-row">
+              <div class="mod-pill active" data-mod="normal" id="mod-pill-normal">Chuẩn</div>
+              <div class="mod-pill" data-mod="turbo" id="mod-pill-turbo">Turbo</div>
+              <div class="mod-pill" data-mod="bouncy" id="mod-pill-bouncy">Siêu Nảy</div>
+              <div class="mod-pill" data-mod="chill" id="mod-pill-chill">Trợ Lực</div>
+            </div>
           </div>
 
           <div class="time-mode-pills">
@@ -1308,9 +1494,35 @@
             </div>
           </div>
 
-          <button class="btn-secondary btn-map-select" id="open-map-select-btn" type="button">🗺️ Chọn map</button>
+          <button class="btn-secondary btn-map-select" id="open-map-select-btn" type="button">🗺️ Danh sách 12 Map</button>
+          <button class="btn-secondary btn-map-select" id="overworld-btn" type="button" style="background:#dcfce7;">🚐 Lái xe chọn Map</button>
 
           <button class="btn-main" id="start-play-btn" type="button">CHƠI NGAY</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3D TOWN OVERWORLD HUD -->
+    <div id="overworld-hud" style="display:none;">
+      <div class="overworld-top-bar">
+        <div class="brand-cluster">
+          <span class="title-logo" style="font-size:18px;">MOVING CHAOS TOWN</span>
+          <span class="star-counter-inline" id="overworld-stars-pill">★ 0/36</span>
+        </div>
+        <button class="status-chip btn-chip" id="overworld-back-btn" type="button">🏠 Menu</button>
+      </div>
+      <div class="overworld-bottom-wrap">
+        <div class="overworld-card">
+          <div class="overworld-info">
+            <div class="overworld-chapter" id="overworld-chapter">Chương 1</div>
+            <div class="overworld-title-row">
+              <h3 id="overworld-map-name">🏠 1. Nhà Phố Khởi Động</h3>
+              <span class="level-stars" id="overworld-map-stars">☆☆☆</span>
+            </div>
+            <div class="spotlight-meta" id="overworld-map-meta">8 món • 80s • Par 55s</div>
+            <div class="overworld-hint" id="overworld-hint">Lái xe [WASD / Mũi tên] tới ô số 1–12 trên bản đồ!</div>
+          </div>
+          <button class="btn-main" id="overworld-launch-btn" type="button">🚚 NHẬN HỢP ĐỒNG</button>
         </div>
       </div>
     </div>
@@ -1326,6 +1538,12 @@
           <div class="level-card" data-level="4"></div>
           <div class="level-card" data-level="5"></div>
           <div class="level-card" data-level="6"></div>
+          <div class="level-card" data-level="7"></div>
+          <div class="level-card" data-level="8"></div>
+          <div class="level-card" data-level="9"></div>
+          <div class="level-card" data-level="10"></div>
+          <div class="level-card" data-level="11"></div>
+          <div class="level-card" data-level="12"></div>
         </div>
         <div class="modal-actions">
           <button class="btn-main" id="map-select-close-btn" type="button" style="padding:10px 20px; font-size:15px;">ĐÓNG</button>
@@ -1430,6 +1648,7 @@
 
       <div class="gameover-actions">
         <button class="btn-main" id="replay-btn" type="button">🔄 CHƠI LẠI</button>
+        <button class="btn-secondary" id="end-overworld-btn" type="button" style="background:#dcfce7;">🚐 BẢN ĐỒ</button>
         <button class="btn-secondary" id="menu-back-btn" type="button">🏠 MENU</button>
       </div>
     </div>

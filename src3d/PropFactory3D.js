@@ -297,9 +297,23 @@ function getBrickWallTex(baseHex = '#e69468', mortarHex = 'rgba(254, 243, 224, 0
   }, 256, true);
 }
 
+function getPlasterWallTex(baseHex = '#7dd3fc') {
+  return getProceduralTexture(`plaster_${baseHex}`, (ctx, s) => {
+    ctx.fillStyle = baseHex;
+    ctx.fillRect(0, 0, s, s);
+    // Subtle wainscot panel stripes like stylized diorama interiors
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
+    for (let i = 0; i < 4; i++) {
+      ctx.fillRect(i * (s / 4) + 6, 10, s / 4 - 12, s - 20);
+    }
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.05)';
+    ctx.fillRect(0, s * 0.72, s, 4);
+  }, 256, true);
+}
+
 /**
- * Builds either a low wooden garden picket fence (h < 1.5) or a cutaway diorama brick/plaster wall
- * topped with a crisp cream cutaway cap (wallMesh + linked capMesh for occlusion fade).
+ * Builds either a low wooden garden picket fence (h < 1.5), an interior painted plaster wall,
+ * or a cutaway exterior brick wall topped with a crisp cream cutaway cap.
  */
 export function createDioramaWall3D(w, h, d, options = {}) {
   const isLowFence = h < 1.5;
@@ -345,7 +359,8 @@ export function createDioramaWall3D(w, h, d, options = {}) {
   }
 
   const wallHex = options.wallHex || '#e59467';
-  const tex = getBrickWallTex(wallHex).clone();
+  const baseTex = options.isInterior ? getPlasterWallTex(wallHex) : getBrickWallTex(wallHex);
+  const tex = baseTex.clone();
   tex.needsUpdate = true;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
@@ -355,7 +370,7 @@ export function createDioramaWall3D(w, h, d, options = {}) {
   const bodyMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: tex,
-    roughness: 0.78,
+    roughness: options.isInterior ? 0.64 : 0.78,
     metalness: 0.02,
     transparent: true,
     opacity: 1.0
@@ -1334,14 +1349,27 @@ export function createPropMesh3D(itemDef) {
     badge.rotation.x = -Math.PI / 2;
     badge.position.y = 0.03;
     group.add(badge);
-  } else if (itemDef.isSuperHeavy || itemDef.isHeavy) {
-    const badge = new THREE.Mesh(
-      new THREE.RingGeometry(0.47, 0.58, 24),
-      new THREE.MeshBasicMaterial({ color: 0xf97316, side: THREE.DoubleSide })
+  } else if (itemDef.isCarryOnly || itemDef.isSuperHeavy || itemDef.isHeavy) {
+    const outerRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.49, 0.62, 24),
+      new THREE.MeshBasicMaterial({ color: 0xea580c, side: THREE.DoubleSide })
     );
-    badge.rotation.x = -Math.PI / 2;
-    badge.position.y = 0.03;
-    group.add(badge);
+    outerRing.rotation.x = -Math.PI / 2;
+    outerRing.position.y = 0.032;
+    const innerRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.37, 0.43, 24),
+      new THREE.MeshBasicMaterial({ color: 0xfdba74, side: THREE.DoubleSide })
+    );
+    innerRing.rotation.x = -Math.PI / 2;
+    innerRing.position.y = 0.032;
+    const lugMat = stdMat(0xea580c, 0.35);
+    [0, Math.PI / 2, Math.PI, -Math.PI / 2].forEach((ang) => {
+      const lug = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.03, 0.08), lugMat);
+      lug.position.set(Math.cos(ang) * 0.56, 0.038, Math.sin(ang) * 0.56);
+      lug.rotation.y = -ang;
+      group.add(lug);
+    });
+    group.add(outerRing, innerRing);
   }
 
   enableShadows(group);

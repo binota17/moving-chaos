@@ -116,6 +116,12 @@ function isPointClearOfGameplay(x, z, def, pad = 1.65) {
   for (const tr of (def.trampolines || [])) {
     if (Math.hypot(x - tr.x, z - tr.z) < tr.r + pad) return false;
   }
+  for (const f of (def.fixtures || [])) {
+    if (Math.hypot(x - f.x, z - f.z) < Math.max(f.w || 1, f.d || 1) * 0.5 + pad) return false;
+  }
+  for (const d of (def.doors || [])) {
+    if (Math.hypot(x - d.x, z - d.z) < (d.width || 2.6) * 0.5 + pad) return false;
+  }
   return true;
 }
 
@@ -272,7 +278,7 @@ export function buildLevelSetDressing3D(def, levelGroup, { lvlId = 1 } = {}) {
   // 3. Perimeter Wooden Yard Fence framing the outdoor property (safely stopping before any Z-road)
   const postMat = new THREE.MeshStandardMaterial({ color: 0xb66f3a, roughness: 0.78 });
   const railMat = new THREE.MeshStandardMaterial({ color: 0xcd8449, roughness: 0.75 });
-  if (lvlId <= 4) {
+  if (lvlId <= 4 || lvlId === 8 || lvlId === 12) {
     const zRoad = roads.find((r) => r.lanes === 'z');
     const roadStopX = zRoad ? (zRoad.x - zRoad.w / 2 - 1.2) : (b.maxX - 3.5);
     const fz = b.minZ - 1.5;
@@ -311,7 +317,7 @@ export function buildLevelSetDressing3D(def, levelGroup, { lvlId = 1 } = {}) {
     }
   });
 
-  if (lvlId === 1) {
+  if (lvlId === 1 || lvlId === 8 || lvlId === 12) {
     // Neighborhood front yard shrubs, pink flamingos & mailbox like Moving Out
     [[2.4, 3.6, 0.9], [2.4, 4.6, 0.78], [1.9, -4.4, 0.85]].forEach(([sx, sz, sc]) => {
       if (isPointClearOfGameplay(sx, sz, def, 0.8)) {
@@ -320,16 +326,17 @@ export function buildLevelSetDressing3D(def, levelGroup, { lvlId = 1 } = {}) {
         levelGroup.add(shrub);
       }
     });
-    const flam1 = createFlamingo();
-    flam1.position.set(3.4, -0.02, -4.8);
-    flam1.rotation.y = 0.6;
-    const flam2 = createFlamingo();
-    flam2.position.set(3.9, -0.02, -4.3);
-    flam2.rotation.y = -0.5;
-    levelGroup.add(flam1, flam2);
-
+    if (lvlId === 1) {
+      const flam1 = createFlamingo();
+      flam1.position.set(3.4, -0.02, -4.8);
+      flam1.rotation.y = 0.6;
+      const flam2 = createFlamingo();
+      flam2.position.set(3.9, -0.02, -4.3);
+      flam2.rotation.y = -0.5;
+      levelGroup.add(flam1, flam2);
+    }
     const mb = createMailbox();
-    mb.position.set(4.5, -0.02, -6.2);
+    mb.position.set(lvlId === 1 ? 4.5 : -13.0, -0.02, lvlId === 1 ? -6.2 : -9.8);
     mb.rotation.y = Math.PI / 2;
     levelGroup.add(mb);
   } else if (lvlId === 2) {
@@ -338,26 +345,28 @@ export function buildLevelSetDressing3D(def, levelGroup, { lvlId = 1 } = {}) {
     levelGroup.add(mb);
   }
 
-  // 5. Interior Cozy Details: Wavy Living Rug, WELCOME Mat & North Wall Clock
-  if (lvlId === 1 || lvlId === 2 || lvlId === 4) {
+  // 5. Interior Cozy Details: Legacy Rug (if no def.rooms), WELCOME Mat & North Wall Clock
+  if (lvlId === 1 || lvlId === 2 || lvlId === 4 || lvlId === 8 || lvlId === 9 || lvlId === 12) {
     const hb = zones[0];
     if (hb) {
-      const rugMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(3.6, 2.4),
-        new THREE.MeshStandardMaterial({
-          map: getWavyRugTex(),
-          roughness: 0.92,
-          polygonOffset: true,
-          polygonOffsetFactor: -2,
-          polygonOffsetUnits: -2
-        })
-      );
-      rugMesh.rotation.x = -Math.PI / 2;
-      const rx = lvlId === 2 ? -9.2 : ((hb.minX + hb.maxX) * 0.5 + 1.1);
-      const rz = lvlId === 2 ? -2.6 : ((hb.minZ + hb.maxZ) * 0.5);
-      rugMesh.position.set(rx, 0.118, rz);
-      rugMesh.receiveShadow = true;
-      levelGroup.add(rugMesh);
+      if (!Array.isArray(def.rooms) || def.rooms.length === 0) {
+        const rugMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(3.6, 2.4),
+          new THREE.MeshStandardMaterial({
+            map: getWavyRugTex(),
+            roughness: 0.92,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2
+          })
+        );
+        rugMesh.rotation.x = -Math.PI / 2;
+        const rx = lvlId === 2 ? -9.2 : ((hb.minX + hb.maxX) * 0.5 + 1.1);
+        const rz = lvlId === 2 ? -2.6 : ((hb.minZ + hb.maxZ) * 0.5);
+        rugMesh.position.set(rx, 0.118, rz);
+        rugMesh.receiveShadow = true;
+        levelGroup.add(rugMesh);
+      }
 
       // Wall clock on North wall
       const clockMesh = new THREE.Mesh(
@@ -382,12 +391,12 @@ export function buildLevelSetDressing3D(def, levelGroup, { lvlId = 1 } = {}) {
       matMesh.rotation.x = -Math.PI / 2;
       if (lvlId === 1) {
         matMesh.rotation.z = Math.PI / 2;
-        matMesh.position.set(1.9, 0.04, 0.0);
+        matMesh.position.set(2.35, 0.04, 2.7);
       } else if (lvlId === 2) {
-        matMesh.position.set(-11.2, 0.04, 2.6);
+        matMesh.position.set(-1.5, 0.04, 2.55);
       } else {
         matMesh.rotation.z = Math.PI / 2;
-        matMesh.position.set(4.3, 0.04, 0.0);
+        matMesh.position.set((hb.maxX || 3.6) + 0.7, 0.04, 0.0);
       }
       levelGroup.add(matMesh);
     }

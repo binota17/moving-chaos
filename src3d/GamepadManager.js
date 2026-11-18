@@ -7,7 +7,7 @@ export class GamepadManager {
     this.onConnectionChange = onConnectionChange;
     this.rumbleEnabled = true;
     this.connectedCount = 0;
-    this.prevSlots = [this._emptyPrev(), this._emptyPrev()];
+    this.prevSlots = [this._emptyPrev(), this._emptyPrev(), this._emptyPrev(), this._emptyPrev()];
     this._bindEvents();
   }
 
@@ -69,14 +69,14 @@ export class GamepadManager {
   }
 
   /**
-   * Reads live movement & edge-triggered actions for slot 0 (P1) and slot 1 (P2).
+   * Reads live movement & edge-triggered actions for up to 4 controller slots (P1..P4).
    */
   poll() {
     const pads = this._getActivePads();
     this.connectedCount = pads.length;
 
-    const results = [null, null];
-    for (let slot = 0; slot < 2; slot++) {
+    const results = [null, null, null, null];
+    for (let slot = 0; slot < 4; slot++) {
       const gp = pads[slot];
       if (!gp) {
         this.prevSlots[slot] = this._emptyPrev();

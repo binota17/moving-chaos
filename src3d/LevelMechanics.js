@@ -475,3 +475,42 @@ export function truckBox(tk, lx, lz, w, d, y, h) {
   return { x: p.x, y, z: p.z, w: swap ? d : w, h, d: swap ? w : d };
 }
 
+const DEFAULT_FIXTURE_DIMS = {
+  kitchen_counter: { w: 2.6, d: 0.9, h: 0.98 },
+  kitchen_island: { w: 2.2, d: 1.0, h: 0.94 },
+  bathtub: { w: 1.85, d: 0.98, h: 0.72 },
+  vanity_sink: { w: 1.5, d: 0.72, h: 0.96 },
+  coffee_table: { w: 1.35, d: 0.82, h: 0.46 },
+  wardrobe: { w: 1.5, d: 0.72, h: 2.15 },
+  nightstand: { w: 0.7, d: 0.65, h: 0.65 },
+  store_rack: { w: 4.4, d: 0.76, h: 2.05 },
+  checkout_counter: { w: 0.82, d: 3.2, h: 1.02 },
+  restaurant_table: { w: 1.25, d: 1.25, h: 0.82 },
+  museum_pedestal: { w: 1.1, d: 1.1, h: 1.15 },
+  control_desk: { w: 2.1, d: 0.86, h: 0.92 },
+  shipping_container: { w: 4.2, d: 2.0, h: 2.4 },
+  yacht_helm: { w: 1.1, d: 0.9, h: 1.25 }
+};
+
+/** Converts collidable static architectural fixtures into axis-aligned obstacle boxes. */
+export function getFixtureObstacles(def) {
+  if (!def || !Array.isArray(def.fixtures)) return [];
+  const list = [];
+  for (const f of def.fixtures) {
+    if (f.collidable === false || f.type === 'potted_plant' || f.type === 'wall_art') continue;
+    const base = DEFAULT_FIXTURE_DIMS[f.type] || { w: 1.0, d: 1.0, h: 1.0 };
+    const fw = f.w ?? base.w;
+    const fd = f.d ?? base.d;
+    const fh = f.h ?? base.h;
+    const swap = Math.abs(Math.sin(f.rotY || 0)) > 0.5;
+    list.push({
+      x: f.x,
+      y: (f.y || 0) + fh / 2,
+      z: f.z,
+      w: swap ? fd : fw,
+      d: swap ? fw : fd,
+      h: fh
+    });
+  }
+  return list;
+}

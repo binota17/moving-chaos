@@ -17,9 +17,14 @@ export class UIManager {
     this.p1StatusEl = document.getElementById('p1-status');
     this.p2HudEl = document.getElementById('p2-hud');
     this.p2StatusEl = document.getElementById('p2-status');
+    this.p3HudEl = document.getElementById('p3-hud');
+    this.p3StatusEl = document.getElementById('p3-status');
+    this.p4HudEl = document.getElementById('p4-hud');
+    this.p4StatusEl = document.getElementById('p4-status');
 
     this.deliveryFeedEl = document.getElementById('delivery-feed');
     this.startOverlayEl = document.getElementById('start-overlay');
+    this.overworldHudEl = document.getElementById('overworld-hud');
     this.pauseOverlayEl = document.getElementById('pause-overlay');
     this.gameoverOverlayEl = document.getElementById('gameover-overlay');
 
@@ -34,7 +39,7 @@ export class UIManager {
     this.finalQuoteEl = document.getElementById('final-quote');
   }
 
-  updateHUD(itemsDelivered, targetItems, score, timeLeft, landlordRage, p1, p2, is2PMode, extra = {}) {
+  updateHUD(itemsDelivered, targetItems, score, timeLeft, landlordRage, p1, p2, playersOrFlag, extra = {}) {
     if (this.truckCountEl) this.truckCountEl.innerText = `${itemsDelivered}/${targetItems}`;
     if (this.scoreTextEl) this.scoreTextEl.innerText = score.toLocaleString('vi-VN') + 'đ';
     if (this.timerTextEl) {
@@ -59,27 +64,38 @@ export class UIManager {
       }
     }
 
-    if (this.p1HudEl) {
-      this.p1HudEl.style.display = is2PMode ? 'flex' : 'none';
-    }
-    if (this.p1StatusEl && p1 && is2PMode) {
-      if (p1.stunTimer > 0) this.p1StatusEl.innerText = '💫';
-      else if (p1.holdingItem) this.p1StatusEl.innerText = '📦 ' + p1.holdingItem.name;
-      else this.p1StatusEl.innerText = t('status_idle');
-    }
+    const playersList = Array.isArray(extra.players)
+      ? extra.players
+      : (Array.isArray(playersOrFlag) ? playersOrFlag : [p1, p2].filter(Boolean));
+    const isMulti = Array.isArray(playersOrFlag)
+      ? playersOrFlag.length > 1
+      : (!!playersOrFlag || playersList.length > 1);
 
-    if (this.p2HudEl && this.p2StatusEl) {
-      if (is2PMode) {
-        this.p2HudEl.style.display = 'flex';
-        if (p2) {
-          if (p2.stunTimer > 0) this.p2StatusEl.innerText = '💫';
-          else if (p2.holdingItem) this.p2StatusEl.innerText = '📦 ' + p2.holdingItem.name;
-          else this.p2StatusEl.innerText = t('status_idle');
+    const pillPairs = [
+      [this.p1HudEl, this.p1StatusEl],
+      [this.p2HudEl, this.p2StatusEl],
+      [this.p3HudEl, this.p3StatusEl],
+      [this.p4HudEl, this.p4StatusEl]
+    ];
+
+    pillPairs.forEach(([hudEl, statusEl], idx) => {
+      if (!hudEl) return;
+      const p = playersList[idx];
+      if (isMulti && p) {
+        hudEl.style.display = 'flex';
+        if (statusEl) {
+          if (p.stunTimer > 0) statusEl.innerText = '💫';
+          else if (p.holdingItem) {
+            const icon = p.holdingItem.isCarryOnly ? '🏋️ ' : '📦 ';
+            statusEl.innerText = icon + p.holdingItem.name;
+          } else {
+            statusEl.innerText = t('status_idle');
+          }
         }
       } else {
-        this.p2HudEl.style.display = 'none';
+        hudEl.style.display = 'none';
       }
-    }
+    });
   }
 
   addFeedPill(text, type = 'normal') {
@@ -99,6 +115,7 @@ export class UIManager {
   showGameOver(score, itemsDelivered, targetItems, landlordRage, options = {}) {
     if (!this.gameoverOverlayEl) return;
     if (this.pauseOverlayEl) this.pauseOverlayEl.style.display = 'none';
+    if (this.overworldHudEl) this.overworldHudEl.style.display = 'none';
 
     if (this.endTitleEl && this.endSubEl) {
       if (landlordRage >= 100) {
@@ -166,25 +183,40 @@ export class UIManager {
 
     if (this.finalRankEl) this.finalRankEl.innerText = rank;
     if (this.finalQuoteEl) this.finalQuoteEl.innerText = quote;
-    this.containerEl?.classList?.remove('is-menu');
+    this.containerEl?.classList?.remove('is-menu', 'is-overworld');
     this.containerEl?.classList?.add('is-gameover');
     this.gameoverOverlayEl.style.display = 'flex';
   }
 
   hideStartMenu() {
-    this.containerEl?.classList?.remove('is-menu');
-    this.containerEl?.classList?.remove('is-gameover');
+    this.containerEl?.classList?.remove('is-menu', 'is-gameover', 'is-overworld');
     if (this.startOverlayEl) this.startOverlayEl.style.display = 'none';
+    if (this.overworldHudEl) this.overworldHudEl.style.display = 'none';
     if (this.gameoverOverlayEl) this.gameoverOverlayEl.style.display = 'none';
     if (this.pauseOverlayEl) this.pauseOverlayEl.style.display = 'none';
   }
 
   showStartMenu() {
     this.containerEl?.classList?.add('is-menu');
-    this.containerEl?.classList?.remove('is-gameover');
+    this.containerEl?.classList?.remove('is-gameover', 'is-overworld');
     if (this.startOverlayEl) this.startOverlayEl.style.display = 'flex';
+    if (this.overworldHudEl) this.overworldHudEl.style.display = 'none';
     if (this.gameoverOverlayEl) this.gameoverOverlayEl.style.display = 'none';
     if (this.pauseOverlayEl) this.pauseOverlayEl.style.display = 'none';
+  }
+
+  showOverworldHUD() {
+    this.containerEl?.classList?.remove('is-menu', 'is-gameover');
+    this.containerEl?.classList?.add('is-overworld');
+    if (this.startOverlayEl) this.startOverlayEl.style.display = 'none';
+    if (this.gameoverOverlayEl) this.gameoverOverlayEl.style.display = 'none';
+    if (this.pauseOverlayEl) this.pauseOverlayEl.style.display = 'none';
+    if (this.overworldHudEl) this.overworldHudEl.style.display = 'flex';
+  }
+
+  hideOverworldHUD() {
+    this.containerEl?.classList?.remove('is-overworld');
+    if (this.overworldHudEl) this.overworldHudEl.style.display = 'none';
   }
 
   setPauseModalVisible(visible) {

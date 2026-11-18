@@ -6,11 +6,13 @@ import * as THREE from 'three';
 import { LEVELS_3D } from './Levels3D.js';
 import { BobiModelCache } from './BobiModelLoader.js';
 import { createPropMesh3D, createTruck3D, createTrampoline3D, createGlassWall3D, getLawnTex, getFloorPatternTex, createDioramaWall3D } from './PropFactory3D.js';
-import { LevelMechanics, isInsideTruckBed, truckBox, inRect } from './LevelMechanics.js';
+import { LevelMechanics, isInsideTruckBed, truckWorldToLocal, truckBox, inRect, getFixtureObstacles } from './LevelMechanics.js';
 import { buildMechanicsVisuals, addRoadMarkings } from './MechanicsVisuals3D.js';
 import { buildLevelSetDressing3D } from './DioramaDecor3D.js';
+import { buildRoomFloors3D, buildArchitecturalFixtures3D } from './InteriorBuilder3D.js';
+import { Overworld3D } from './Overworld3D.js';
 import { t, setLang, getLevelText } from './i18n.js';
-import { loadSettings, saveSettings, evaluateBonusStatus, evaluateMatchStars, ProgressStore } from './ProgressStore.js';
+import { loadSettings, saveSettings, evaluateBonusStatus, evaluateMatchStars, ProgressStore, BOBI_SKINS, isSkinUnlocked } from './ProgressStore.js';
 import { GamepadManager } from './GamepadManager.js';
 import { soundManager } from '../src/core/SoundManager.js';
 import { NetworkManager } from '../src/network/NetworkManager.js';
@@ -28,14 +30,19 @@ export class Game3DApp {
     this.settings = loadSettings();
     setLang(this.settings.lang);
 
-    this.gameState = 'MENU'; // 'MENU', 'PLAYING', 'PAUSED', 'GAMEOVER'
-    this.gameMode = 'SOLO';  // 'SOLO', 'LOCAL_2P', 'LAN_COOP'
+    this.gameState = 'MENU'; // 'MENU', 'OVERWORLD', 'PLAYING', 'PAUSED', 'GAMEOVER'
+    this.gameMode = 'SOLO';  // 'SOLO', 'LOCAL_2P', 'LOCAL_3P', 'LOCAL_4P', 'LAN_COOP'
     this.settingsModalOpen = false;
     this.controlsModalOpen = false;
     this.mapSelectModalOpen = false;
     this.currentLevel = 1;
     this.selectedVariantP1 = 'base';
     this.selectedVariantP2 = 'builder';
+    this.selectedSkin = this.settings.selectedSkin || 'classic';
+    this.selectedModifier = this.settings.modifier || 'normal';
+    this.overworld = null;
+    this.overworldLastPadId = null;
+    this.truckCargoPlacements = [];
 
     this.score = 0;
     this.timeLeft = 75;
@@ -79,7 +86,7 @@ export class Game3DApp {
     // Input, Gamepad & Co-op event state
     this.keys = {};
     this.p2RemoteKeys = {};
-    this.padStates = [null, null];
+    this.padStates = [null, null, null, null];
     this.gamepadManager = new GamepadManager((connected, idx, total) => {
       this.updateGamepadStatusChip(total);
       this.ui.addFeedPill(
@@ -528,12 +535,33 @@ export class Game3DApp {
     this.particles = [];
     this.mechanics = null;
     this.mechVisuals = null;
+    this.overworld = null;
+    this.truckCargoPlacements = [];
     this.lastItemSnapshots = [];
     this.lastP2SentPayload = '';
     this.pendingNetEvents = [];
     this.trajectoryDots.forEach(d => d.visible = false);
     if (this.grabHighlightRing) this.grabHighlightRing.visible = false;
     if (this.truckGuideArrow) this.truckGuideArrow.visible = false;
+  }
+
+  isLocalMultiMode() {
+    return this.gameMode === 'LOCAL_2P' || this.gameMode === 'LOCAL_3P' || this.gameMode === 'LOCAL_4P';
+  }
+
+  getTargetPlayerCount() {
+    if (this.gameMode === 'LOCAL_4P') return 4;
+    if (this.gameMode === 'LOCAL_3P') return 3;
+    if (this.gameMode === 'LOCAL_2P' || this.gameMode === 'LAN_COOP') return 2;
+    return 1;
+  }
+
+  getP1ActiveTintHex() {
+    const levelIds = Object.keys(LEVELS_3D).map(Number);
+    const totalStars = this.progressStore.getTotalStars(levelIds);
+    if (!isSkinUnlocked(this.selectedSkin, totalStars)) return null;
+    const skin = BOBI_SKINS.find(s => s.id === this.selectedSkin);
+    return skin?.tintHex ?? null;
   }
 
   async setupLevel(lvlId) {
@@ -545,7 +573,8 @@ export class Game3DApp {
 
       this.itemsDelivered = 0;
       this.targetItemsCount = def.targetItems;
-      this.timeLeft = this.unlimitedTime ? -1 : def.timeLimit;
+      const chillBonus = this.selectedModifier === 'chill' ? 30 : 0;
+      this.timeLeft = this.unlimitedTime ? -1 : (def.timeLimit + chillBonus);
       this.landlordRage = 0;
       this.matchStats = { windowsBroken: 0, fragileBroken: 0, anyItemBroken: 0, hazardHits: 0 };
       this.deliveryCombo = 0;
@@ -617,6 +646,24 @@ export class Game3DApp {
       } else if (lvlId === 6) {
         styleKey = 'warehouse_grid';
         baseHex = '#cbd5e1';
+      } else if (lvlId === 7) {
+        styleKey = 'bistro_tile';
+        baseHex = '#e0f2fe';
+      } else if (lvlId === 8) {
+        styleKey = 'parquet_lavender';
+        baseHex = '#fbcfe8';
+      } else if (lvlId === 9) {
+        styleKey = 'parquet_lavender';
+        baseHex = '#fde68a';
+      } else if (lvlId === 10) {
+        styleKey = 'polka_blue';
+        baseHex = '#bae6fd';
+      } else if (lvlId === 11) {
+        styleKey = 'concrete_site';
+        baseHex = '#cbd5e1';
+      } else if (lvlId === 12) {
+        styleKey = 'parquet_lavender';
+        baseHex = '#fef08a';
       }
       const patTex = getFloorPatternTex(styleKey, baseHex).clone();
       patTex.wrapS = THREE.RepeatWrapping;
@@ -632,29 +679,8 @@ export class Game3DApp {
       this.levelGroup.add(houseFloor);
     });
 
-    // Level 1 kitchen tiled nook (classic white checkerboard contrasting the coral polka living room)
-    if (lvlId === 1) {
-      const kitchenTileTex = getFloorPatternTex('bistro_tile', '#f8fafc').clone();
-      kitchenTileTex.wrapS = THREE.RepeatWrapping;
-      kitchenTileTex.wrapT = THREE.RepeatWrapping;
-      kitchenTileTex.repeat.set(1.5, 1.5);
-      kitchenTileTex.needsUpdate = true;
-      const kitchenPad = new THREE.Mesh(
-        new THREE.PlaneGeometry(3.8, 3.8),
-        new THREE.MeshStandardMaterial({
-          color: 0xffffff,
-          map: kitchenTileTex,
-          roughness: 0.45,
-          polygonOffset: true,
-          polygonOffsetFactor: -1,
-          polygonOffsetUnits: -1
-        })
-      );
-      kitchenPad.rotation.x = -Math.PI / 2;
-      kitchenPad.position.set(-7.6, 0.114, 3.8);
-      kitchenPad.receiveShadow = true;
-      this.levelGroup.add(kitchenPad);
-    }
+    // Distinct per-room flooring, rugs, thresholds & open door frames
+    buildRoomFloors3D(def, this.levelGroup);
 
     // Platforms (Upper Tiers) - fadeable if occluding player below
     def.platforms.forEach((p) => {
@@ -707,11 +733,21 @@ export class Game3DApp {
       3: '#e8b06b',
       4: '#d98a5f',
       5: '#d99043',
-      6: '#94a3b8'
+      6: '#94a3b8',
+      7: '#60a5fa',
+      8: '#f472b6',
+      9: '#818cf8',
+      10: '#38bdf8',
+      11: '#64748b',
+      12: '#f59e0b'
     };
     const wallHex = wallPalette[lvlId] || '#e59467';
     def.walls.forEach((w) => {
-      const m = createDioramaWall3D(w.w, w.h, w.d, { wallHex, capHex: 0xfef7e6 });
+      const m = createDioramaWall3D(w.w, w.h, w.d, {
+        wallHex: w.wallHex || wallHex,
+        isInterior: !!w.isInterior,
+        capHex: 0xfef7e6
+      });
       m.position.set(w.x, m.userData.overrideY ?? w.y, w.z);
       this.levelGroup.add(m);
       this.occluderMeshes.push(m);
@@ -743,18 +779,41 @@ export class Game3DApp {
     // Cozy diorama set dressing (sidewalk curbs, grass tufts, perimeter fence, trees, flamingos, rug, clock)
     buildLevelSetDressing3D(def, this.levelGroup, { lvlId });
 
+    // Non-movable architectural room fixtures (counters, tubs, vanities, racks, desks, art, plants)
+    buildArchitecturalFixtures3D(def, this.levelGroup);
+
     // Interactive Level Mechanics (switches, gates, pits, zones, elevators, hazards)
     this.mechanics = new LevelMechanics(def);
     this.mechVisuals = buildMechanicsVisuals(this.mechanics, this.levelGroup);
 
-    // 2. Spawn 3D Furniture Items
+    // 2. Spawn 3D Furniture Items (with Carry-Only vs Throwable & Oriented Doorway Footprints)
+    const FOOTPRINT_BY_TYPE = {
+      bed: { footW: 1.05, footD: 1.55 },
+      dining_table: { footW: 1.48, footD: 0.92 },
+      sofa: { footW: 1.45, footD: 0.78 },
+      bookshelf: { footW: 1.08, footD: 0.56 },
+      piano: { footW: 1.32, footD: 0.95 },
+      fridge: { footW: 0.86, footD: 0.86 },
+      washer: { footW: 0.84, footD: 0.84 },
+      stove: { footW: 0.88, footD: 0.84 },
+      safe: { footW: 0.84, footD: 0.84 },
+      generator: { footW: 0.92, footD: 0.78 }
+    };
+
     def.items.forEach((iDef, idx) => {
-      const mesh = createPropMesh3D(iDef);
+      const isCarryOnly = iDef.isCarryOnly !== undefined
+        ? !!iDef.isCarryOnly
+        : !!(iDef.isHeavy || iDef.isSuperHeavy);
+      const fp = FOOTPRINT_BY_TYPE[iDef.type] || null;
+      const mesh = createPropMesh3D({ ...iDef, isCarryOnly });
       mesh.position.set(iDef.x, iDef.y + 0.05, iDef.z);
       this.levelGroup.add(mesh);
       this.items.push({
         id: idx,
         ...iDef,
+        isCarryOnly,
+        footW: fp ? fp.footW : 0,
+        footD: fp ? fp.footD : 0,
         spawnX: iDef.x,
         spawnY: iDef.y,
         spawnZ: iDef.z,
@@ -764,7 +823,7 @@ export class Game3DApp {
         hazardCooldown: 0,
         hopTimer: 0.9 + Math.random() * 1.4,
         lastOwnerVariant: null,
-        radius: (iDef.isSuperHeavy || iDef.type === 'sofa' || iDef.type === 'bed' || iDef.type === 'dining_table' || iDef.type === 'bookshelf') ? 0.64 : 0.42,
+        radius: (iDef.isSuperHeavy || iDef.type === 'sofa' || iDef.type === 'bed' || iDef.type === 'dining_table' || iDef.type === 'bookshelf' || iDef.type === 'piano') ? 0.64 : 0.42,
         isHeld: false,
         heldBy: null,
         isDelivered: false,
@@ -773,26 +832,26 @@ export class Game3DApp {
       });
     });
 
-    // 3. Spawn Real 3D Bobi Characters at map-defined spawn positions
-    const sp1 = def.spawns?.[0] || { x: -1.5, y: 0.1, z: 1.5 };
-    const sp2 = def.spawns?.[1] || { x: -2.5, y: 0.1, z: -1.0 };
+    // 3. Spawn 1-4 Real 3D Bobi Characters at map-defined spawn positions
+    const pCount = this.getTargetPlayerCount();
+    const playerSlots = [
+      { variant: this.selectedVariantP1, tint: this.getP1ActiveTintHex(), badge: 'P1', color: '#f97316', fallback: { x: -1.5, y: 0.1, z: 1.5 } },
+      { variant: this.selectedVariantP2, tint: 0xfda4af, badge: 'P2', color: '#0284c7', fallback: { x: -2.5, y: 0.1, z: -1.0 } },
+      { variant: 'builder', tint: 0x86efac, badge: 'P3', color: '#16a34a', fallback: { x: -0.6, y: 0.1, z: -1.2 } },
+      { variant: 'chef', tint: 0xc4b5fd, badge: 'P4', color: '#a855f7', fallback: { x: -2.4, y: 0.1, z: 1.8 } }
+    ];
 
-    const p1Bobi = await this.modelCache.createCharacter(this.selectedVariantP1);
-    if (loadSeq !== this.levelLoadSeq) return;
-    if (this.gameMode !== 'SOLO') {
-      p1Bobi.setPlayerBadge('P1', '#f97316');
-    }
-    const p1 = this.createPlayerEntity(1, 'Bobi P1', p1Bobi, sp1.x, sp1.y, sp1.z, this.selectedVariantP1);
-    this.players.push(p1);
-    this.levelGroup.add(p1.bobi.root);
-
-    if (this.gameMode !== 'SOLO') {
-      const p2Bobi = await this.modelCache.createCharacter(this.selectedVariantP2);
+    for (let i = 0; i < pCount; i++) {
+      const slotCfg = playerSlots[i];
+      const sp = def.spawns?.[i] || slotCfg.fallback;
+      const bobi = await this.modelCache.createCharacter(slotCfg.variant, slotCfg.tint);
       if (loadSeq !== this.levelLoadSeq) return;
-      p2Bobi.setPlayerBadge('P2', '#0284c7');
-      const p2 = this.createPlayerEntity(2, 'Bobi P2', p2Bobi, sp2.x, sp2.y, sp2.z, this.selectedVariantP2);
-      this.players.push(p2);
-      this.levelGroup.add(p2.bobi.root);
+      if (pCount > 1) {
+        bobi.setPlayerBadge(slotCfg.badge, slotCfg.color);
+      }
+      const p = this.createPlayerEntity(i + 1, `Bobi ${slotCfg.badge}`, bobi, sp.x, sp.y, sp.z, slotCfg.variant);
+      this.players.push(p);
+      this.levelGroup.add(p.bobi.root);
     }
 
     this.syncHUD();
@@ -841,7 +900,7 @@ export class Game3DApp {
       if (p1.bobi.disposeBadge) p1.bobi.disposeBadge();
     }
     this.levelGroup.remove(p1.bobi.root);
-    const newBobi = await this.modelCache.createCharacter(this.selectedVariantP1);
+    const newBobi = await this.modelCache.createCharacter(this.selectedVariantP1, this.getP1ActiveTintHex());
     if (this.gameState !== 'MENU' || !this.players[0]) return;
     if (this.gameMode !== 'SOLO') {
       newBobi.setPlayerBadge('P1', '#f97316');
@@ -866,6 +925,8 @@ export class Game3DApp {
           this.closeControlsModal();
         } else if (this.settingsModalOpen) {
           this.closePauseOrSettings();
+        } else if (this.gameState === 'OVERWORLD') {
+          this.exitOverworldToMenu();
         } else if (this.gameState === 'PLAYING') {
           this.openPauseOrSettings();
         }
@@ -873,6 +934,21 @@ export class Game3DApp {
       }
 
       this.keys[code] = true;
+
+      if (this.gameState === 'OVERWORLD' && !this.settingsModalOpen) {
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) {
+          e.preventDefault();
+        }
+        if (!wasDown) {
+          if (code === 'KeyQ') this.rotateCamera(-Math.PI / 4);
+          if (code === 'KeyR') this.rotateCamera(Math.PI / 4);
+          if ((code === 'Space' || code === 'Enter' || code === 'KeyJ') && this.overworld?.hoveredLevelId) {
+            this.currentLevel = this.overworld.hoveredLevelId;
+            this.startOrRestartMatch();
+          }
+        }
+        return;
+      }
 
       if (this.gameState !== 'PLAYING' || this.settingsModalOpen) return;
 
@@ -885,41 +961,59 @@ export class Game3DApp {
       }
 
       const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
-      const isSinglePersonScreen = this.gameMode !== 'LOCAL_2P';
+      const isSingleKeyboard = !this.isLocalMultiMode();
 
       // Camera Rotate (Q / R) works anytime during gameplay
       if (!wasDown) {
         if (code === 'KeyQ') this.rotateCamera(-Math.PI / 4);
         if (code === 'KeyR') this.rotateCamera(Math.PI / 4);
+        if (code === 'KeyG') {
+          const emoteTarget = isLanClient ? p2 : p1;
+          if (emoteTarget) this.triggerPlayerEmote(emoteTarget);
+        }
+        if (code === 'KeyH' && p2 && this.isLocalMultiMode()) {
+          this.triggerPlayerEmote(p2);
+        }
       }
 
-      // Moving Out-inspired two-hand ergonomic bindings (legacy E/F completely removed):
-      // - Solo / LAN Co-op: Left hand WASD/Arrows + Space (Jump) + Shift (Sprint);
-      //   Right hand J (Grab/Drop) + K (Hold & Throw), or Mouse.
-      // - Local 2P Split Keyboard: P1 Left (WASD + Space + C Grab + V Throw);
-      //   P2 Right (Arrows + Enter/Num0/ShiftRight + K/Num1 Grab + L/Num2 Throw).
-      const isP1GrabKey = isSinglePersonScreen ? code === 'KeyJ' : code === 'KeyC';
-      const isP1ThrowKey = isSinglePersonScreen ? code === 'KeyK' : code === 'KeyV';
+      const isP1GrabKey = isSingleKeyboard ? code === 'KeyJ' : code === 'KeyC';
+      const isP1ThrowKey = isSingleKeyboard ? code === 'KeyK' : code === 'KeyV';
       const isP1DashKey = code === 'KeyF';
 
       if (!wasDown && isLanClient && p2) {
         if (code === 'Space') this.playerJump(p2);
         if (isP1GrabKey) this.sendClientActionSafe('grab', p2);
         if (isP1DashKey && this.triggerDash(p2)) this.sendClientActionSafe('dash', p2);
-        if (isP1ThrowKey && p2.holdingItem) p2.chargingThrow = true;
+        if (isP1ThrowKey && p2.holdingItem) {
+          if (p2.holdingItem.isCarryOnly) {
+            this.sendClientActionSafe('throw', p2, false);
+          } else {
+            p2.chargingThrow = true;
+          }
+        }
       } else if (!wasDown && !isLanClient && p1) {
         if (code === 'Space') this.playerJump(p1);
         if (isP1GrabKey) this.toggleGrab(p1);
         if (isP1DashKey) this.triggerDash(p1);
-        if (isP1ThrowKey && p1.holdingItem) p1.chargingThrow = true;
+        if (isP1ThrowKey && p1.holdingItem) {
+          if (p1.holdingItem.isCarryOnly) {
+            this.releaseThrow(p1);
+          } else {
+            p1.chargingThrow = true;
+          }
+        }
       }
 
-      if (!wasDown && p2 && this.gameMode === 'LOCAL_2P') {
+      if (!wasDown && p2 && this.isLocalMultiMode()) {
         if (code === 'ShiftRight' || code === 'Enter' || code === 'Numpad0') this.playerJump(p2);
         if (code === 'Slash' || code === 'Numpad3') this.triggerDash(p2);
         if (code === 'KeyK' || code === 'Numpad1') this.toggleGrab(p2);
         if ((code === 'KeyL' || code === 'Numpad2') && p2.holdingItem) {
-          p2.chargingThrow = true;
+          if (p2.holdingItem.isCarryOnly) {
+            this.releaseThrow(p2);
+          } else {
+            p2.chargingThrow = true;
+          }
         }
       }
     });
@@ -933,8 +1027,8 @@ export class Game3DApp {
       const p1 = this.players[0];
       const p2 = this.players[1];
       const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
-      const isSinglePersonScreen = this.gameMode !== 'LOCAL_2P';
-      const isP1ThrowKey = isSinglePersonScreen ? code === 'KeyK' : code === 'KeyV';
+      const isSingleKeyboard = !this.isLocalMultiMode();
+      const isP1ThrowKey = isSingleKeyboard ? code === 'KeyK' : code === 'KeyV';
 
       if (isLanClient && isP1ThrowKey && p2 && p2.chargingThrow) {
         this.sendClientActionSafe('throw', p2, false);
@@ -944,7 +1038,7 @@ export class Game3DApp {
         this.releaseThrow(p1);
       }
 
-      if ((code === 'KeyL' || code === 'Numpad2') && p2 && p2.chargingThrow && this.gameMode === 'LOCAL_2P') {
+      if ((code === 'KeyL' || code === 'Numpad2') && p2 && p2.chargingThrow && this.isLocalMultiMode()) {
         this.releaseThrow(p2);
       }
     });
@@ -952,14 +1046,14 @@ export class Game3DApp {
     // Mouse Wheel Zoom
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.camZoom = THREE.MathUtils.clamp(this.camZoom + Math.sign(e.deltaY) * 0.08, 0.70, 1.40);
+      this.camZoom = THREE.MathUtils.clamp(this.camZoom + Math.sign(e.deltaY) * 0.08, 0.70, 1.45);
     }, { passive: false });
 
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    // Mouse Aim + Throw for active local player in single-screen modes (Solo / LAN Co-op)
+    // Mouse Aim + Throw for active local player in single-keyboard modes (Solo / LAN Co-op)
     this.canvas.addEventListener('pointerdown', (e) => {
-      if (this.gameState !== 'PLAYING' || this.gameMode === 'LOCAL_2P') return;
+      if (this.gameState !== 'PLAYING' || this.isLocalMultiMode()) return;
       soundManager.init();
       const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
       const activePlayer = isLanClient ? this.players[1] : this.players[0];
@@ -978,8 +1072,16 @@ export class Game3DApp {
       }
 
       if (activePlayer.holdingItem) {
-        this.pointerAiming = true;
-        activePlayer.chargingThrow = true;
+        if (activePlayer.holdingItem.isCarryOnly) {
+          if (isLanClient) {
+            this.sendClientActionSafe('throw', activePlayer, true);
+          } else {
+            this.releaseThrow(activePlayer, true);
+          }
+        } else {
+          this.pointerAiming = true;
+          activePlayer.chargingThrow = true;
+        }
       } else if (isLanClient) {
         this.sendClientActionSafe('grab', activePlayer);
       } else {
@@ -1032,7 +1134,7 @@ export class Game3DApp {
       if (lanPanel) lanPanel.style.display = 'none';
       if (p1Label) p1Label.innerHTML = t('ctrl_single_hud');
       if (p2Label) p2Label.style.display = 'none';
-    } else if (this.gameMode === 'LOCAL_2P') {
+    } else if (this.isLocalMultiMode()) {
       if (lanPanel) lanPanel.style.display = 'none';
       if (p1Label) p1Label.innerHTML = t('ctrl_p1_hud');
       if (p2Label) {
@@ -1077,7 +1179,29 @@ export class Game3DApp {
       if (e.target?.id === 'map-select-modal') this.closeMapSelectModal();
     });
 
-    // Game Mode Tabs
+    // Overworld 3D Map Hub Buttons
+    document.getElementById('overworld-btn')?.addEventListener('click', () => this.enterOverworld());
+    document.getElementById('overworld-back-btn')?.addEventListener('click', () => this.exitOverworldToMenu());
+    document.getElementById('overworld-launch-btn')?.addEventListener('click', () => {
+      if (this.overworld?.hoveredLevelId) {
+        this.currentLevel = this.overworld.hoveredLevelId;
+      }
+      this.startOrRestartMatch();
+    });
+    document.getElementById('end-overworld-btn')?.addEventListener('click', () => this.enterOverworld());
+
+    // Match Modifier Pills
+    document.querySelectorAll('.mod-pill').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.mod-pill').forEach(x => x.classList.remove('active'));
+        pill.classList.add('active');
+        this.selectedModifier = pill.dataset.mod || 'normal';
+        this.settings.modifier = this.selectedModifier;
+        saveSettings(this.settings);
+      });
+    });
+
+    // Game Mode Tabs (1P, 2P, 3P, 4P, LAN)
     document.querySelectorAll('.mode-tab').forEach((tab) => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
@@ -1339,6 +1463,9 @@ export class Game3DApp {
     setText('sec-char-mode-label', t('sec_character_mode'));
     setText('sec-levels-label', t('sec_levels'));
     setText('open-map-select-btn', t('open_map_select_btn'));
+    setText('overworld-btn', t('overworld_btn'));
+    setText('overworld-launch-btn', t('overworld_launch_btn'));
+    setText('overworld-back-btn', t('overworld_back_btn'));
     setText('map-select-modal-title', t('map_select_modal_title'));
     setText('map-select-close-btn', t('btn_close'));
     setText('var-base-title', t('variant_base_title'));
@@ -1352,7 +1479,15 @@ export class Game3DApp {
     setText('var-chef-perk', t('variant_chef_perk'));
     setText('mode-tab-solo', t('mode_solo'));
     setText('mode-tab-local2p', t('mode_local2p'));
+    setText('mode-tab-local3p', t('mode_local3p'));
+    setText('mode-tab-local4p', t('mode_local4p'));
     setText('mode-tab-lan', t('mode_lan'));
+    setText('skin-picker-label', t('skin_label'));
+    setText('mod-picker-label', t('mod_label'));
+    setText('mod-pill-normal', t('mod_normal'));
+    setText('mod-pill-turbo', t('mod_turbo'));
+    setText('mod-pill-bouncy', t('mod_bouncy'));
+    setText('mod-pill-chill', t('mod_chill'));
     setText('time-mode-label', t('time_label'));
     setText('time-pill-std', t('time_standard'));
     setText('time-pill-unl', t('time_unlimited'));
@@ -1398,6 +1533,39 @@ export class Game3DApp {
     this.updateGamepadStatusChip(this.gamepadManager.connectedCount);
   }
 
+  renderSkinAndModifierUI(totalStars = 0) {
+    const skinRow = document.getElementById('skin-picker-row');
+    if (skinRow) {
+      skinRow.innerHTML = '';
+      BOBI_SKINS.forEach((skin) => {
+        const unlocked = isSkinUnlocked(skin.id, totalStars);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'skin-swatch' + (this.selectedSkin === skin.id ? ' selected' : '') + (!unlocked ? ' locked' : '');
+        btn.style.background = skin.swatch;
+        btn.title = `${this.settings.lang === 'en' ? skin.nameEn : skin.nameVi}${unlocked ? '' : ` (${skin.reqStars}★)`}`;
+        btn.innerHTML = unlocked ? (this.selectedSkin === skin.id ? '✓' : '') : `<span class="skin-lock-tag">🔒${skin.reqStars}★</span>`;
+        btn.addEventListener('click', () => {
+          if (!unlocked) {
+            this.ui.addFeedPill(`<span>🔒 ${t('skin_locked_toast', { stars: skin.reqStars })}</span>`, 'bounce');
+            soundManager.bonk();
+            return;
+          }
+          this.selectedSkin = skin.id;
+          this.settings.selectedSkin = skin.id;
+          saveSettings(this.settings);
+          this.renderSkinAndModifierUI(totalStars);
+          this.refreshMenuAvatar();
+        });
+        skinRow.appendChild(btn);
+      });
+    }
+
+    document.querySelectorAll('.mod-pill').forEach((pill) => {
+      pill.classList.toggle('active', (pill.dataset.mod || 'normal') === this.selectedModifier);
+    });
+  }
+
   renderProgressCards() {
     const levelIds = Object.keys(LEVELS_3D).map(Number);
     const totalStars = this.progressStore.getTotalStars(levelIds);
@@ -1406,6 +1574,11 @@ export class Game3DApp {
     if (totalPill) {
       totalPill.innerText = t('total_stars_fmt', { stars: totalStars, max: maxStars });
     }
+    const ovPill = document.getElementById('overworld-stars-pill');
+    if (ovPill) {
+      ovPill.innerText = t('total_stars_fmt', { stars: totalStars, max: maxStars });
+    }
+    this.renderSkinAndModifierUI(totalStars);
 
     document.querySelectorAll('.level-card').forEach((card) => {
       const id = parseInt(card.dataset.level, 10);
@@ -1469,7 +1642,13 @@ export class Game3DApp {
       3: '#ef4444',
       4: '#f97316',
       5: '#eab308',
-      6: '#06b6d4'
+      6: '#06b6d4',
+      7: '#10b981',
+      8: '#ec4899',
+      9: '#6366f1',
+      10: '#0ea5e9',
+      11: '#475569',
+      12: '#f59e0b'
     };
     const startOverlay = document.getElementById('start-overlay');
     if (startOverlay) startOverlay.style.setProperty('--active-lvl-accent', accents[id] || '#f59e0b');
@@ -1609,10 +1788,95 @@ export class Game3DApp {
   returnToMenu() {
     this.settingsModalOpen = false;
     this.ui.setPauseModalVisible(false);
+    this.ui.hideOverworldHUD();
     this.gameState = 'MENU';
     soundManager.stopBGM();
     this.renderProgressCards();
     this.ui.showStartMenu();
+    if (!this.players[0]) {
+      this.setupLevel(this.currentLevel);
+    }
+  }
+
+  enterOverworld() {
+    soundManager.init();
+    this.settingsModalOpen = false;
+    this.closeControlsModal();
+    this.closeMapSelectModal();
+    this.ui.setPauseModalVisible(false);
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    soundManager.stopBGM();
+
+    this.clearLevelObjects();
+    this.gameState = 'OVERWORLD';
+    this.overworldLastPadId = null;
+    this.overworld = new Overworld3D(this.levelGroup, this.progressStore, this.currentLevel);
+    this.targetCamAngle = 0.0;
+    this.camAngle = 0.0;
+
+    const levelIds = Object.keys(LEVELS_3D).map(Number);
+    const totalStars = this.progressStore.getTotalStars(levelIds);
+    const ovPill = document.getElementById('overworld-stars-pill');
+    if (ovPill) ovPill.innerText = t('total_stars_fmt', { stars: totalStars, max: levelIds.length * 3 });
+
+    this.ui.showOverworldHUD();
+    this.syncOverworldHUD({
+      levelId: this.currentLevel,
+      levelDef: LEVELS_3D[this.currentLevel],
+      levelText: getLevelText(this.currentLevel)
+    });
+  }
+
+  async exitOverworldToMenu() {
+    this.ui.hideOverworldHUD();
+    this.gameState = 'MENU';
+    this.targetCamAngle = 0.22;
+    await this.setupLevel(this.currentLevel);
+    this.renderProgressCards();
+    this.ui.showStartMenu();
+  }
+
+  syncOverworldHUD(ovState) {
+    if (!ovState) return;
+    const lvlId = ovState.levelId || this.currentLevel || 1;
+    const def = ovState.levelDef || LEVELS_3D[lvlId] || LEVELS_3D[1];
+    const txt = ovState.levelText || getLevelText(lvlId);
+    const rec = this.progressStore.getLevelRecord(lvlId);
+    const isParked = !!ovState.levelId;
+
+    if (ovState.levelId && ovState.levelId !== this.overworldLastPadId) {
+      this.overworldLastPadId = ovState.levelId;
+      this.currentLevel = ovState.levelId;
+      soundManager.grab();
+    } else if (!ovState.levelId) {
+      this.overworldLastPadId = null;
+    }
+
+    const chEl = document.getElementById('overworld-chapter');
+    const nameEl = document.getElementById('overworld-map-name');
+    const starsEl = document.getElementById('overworld-map-stars');
+    const metaEl = document.getElementById('overworld-map-meta');
+    const hintEl = document.getElementById('overworld-hint');
+    const launchBtn = document.getElementById('overworld-launch-btn');
+
+    if (chEl) chEl.innerText = txt.chapter || '';
+    if (nameEl) nameEl.innerText = txt.name;
+    if (starsEl) {
+      let sHtml = '';
+      for (let s = 1; s <= 3; s++) sHtml += `<span class="${s <= rec.bestStars ? 'star-lit' : 'star-dim'}">★</span>`;
+      starsEl.innerHTML = sHtml;
+    }
+    if (metaEl) {
+      metaEl.innerText = `${t('spotlight_items', { count: def.targetItems })} • ${def.timeLimit}s • ${t('par_label', { sec: def.parTime || def.timeLimit })}`;
+    }
+    if (hintEl) {
+      hintEl.innerText = isParked ? t('overworld_park_hint') : t('overworld_roam_hint');
+      hintEl.style.color = isParked ? '#179c52' : '#526071';
+    }
+    if (launchBtn) {
+      launchBtn.disabled = !isParked;
+      launchBtn.style.opacity = isParked ? '1' : '0.55';
+    }
   }
 
   toggleFullscreen() {
@@ -1790,6 +2054,14 @@ export class Game3DApp {
     const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
     const activeP = isLanClient ? this.players[1] : this.players[0];
     if (activeP && activeP.holdingItem) {
+      if (activeP.holdingItem.isCarryOnly) {
+        if (isLanClient) {
+          this.sendClientActionSafe('throw', activeP, false);
+        } else {
+          this.releaseThrow(activeP);
+        }
+        return;
+      }
       activeP.throwPower = Math.max(0.25, activeP.throwPower || 0);
       activeP.chargingThrow = true;
     }
@@ -1815,7 +2087,7 @@ export class Game3DApp {
     if (this.gameMode === 'LAN_COOP' && this.network.role === 'client') {
       const p2 = this.players[1];
       if (p2 && p2.holdingItem) {
-        p2.throwPower = 0.7;
+        p2.throwPower = p2.holdingItem.isCarryOnly ? 0 : 0.7;
         this.sendClientActionSafe('throw', p2, false);
       }
     } else if (this.players[0]) {
@@ -1849,21 +2121,37 @@ export class Game3DApp {
     if (this.unlimitedTime) {
       return Math.max(0, Math.abs(this.timeLeft + 1));
     }
-    return Math.max(0, def.timeLimit - Math.max(0, this.timeLeft));
+    const baseTime = def.timeLimit + (this.selectedModifier === 'chill' ? 30 : 0);
+    return Math.max(0, baseTime - Math.max(0, this.timeLeft));
   }
 
   rumblePlayer(p, intensity = 0.4, durationMs = 100) {
     if (!this.gamepadManager) return;
-    const slot = (this.gameMode === 'LOCAL_2P' && p === this.players[1]) ? 1 : 0;
+    const idx = this.players.indexOf(p);
+    const slot = (this.isLocalMultiMode() && idx >= 0) ? idx : 0;
     this.gamepadManager.rumble(slot, intensity, durationMs);
   }
 
   rumbleAllActive(intensity = 0.4, durationMs = 110) {
     if (!this.gamepadManager) return;
-    this.gamepadManager.rumble(0, intensity, durationMs);
-    if (this.gameMode === 'LOCAL_2P') {
-      this.gamepadManager.rumble(1, intensity, durationMs);
+    const count = this.isLocalMultiMode() ? Math.max(1, this.players.length) : 1;
+    for (let i = 0; i < count; i++) {
+      this.gamepadManager.rumble(i, intensity, durationMs);
     }
+  }
+
+  triggerPlayerEmote(p) {
+    if (!p || this.gameState !== 'PLAYING') return;
+    const now = performance.now();
+    if (now - (p._lastEmoteAt || 0) < 420) return;
+    p._lastEmoteAt = now;
+    const emotes = ['👍 Đỉnh!', '🔥 Cố lên!', '🆘 Phụ với!', '😂 Hihi!'];
+    p._emoteIdx = ((p._emoteIdx || 0) + 1) % emotes.length;
+    p.squashX = 1.22;
+    p.squashY = 0.82;
+    soundManager.grab();
+    this.emitBurst(p.x, p.y + 1.4, p.z, 0xfde047, 8);
+    this.spawnFloatingText(emotes[p._emoteIdx], p.x, p.y + 2.05, p.z, '#fde047');
   }
 
   async startGame() {
@@ -2061,24 +2349,55 @@ export class Game3DApp {
     return true;
   }
 
-  mountDeliveredItemInTruck(it) {
+  mountDeliveredItemInTruck(it, landX = null, landZ = null) {
     const cargoMount = this.truck?.mesh?.userData?.cargoMount;
     if (!cargoMount || !it?.mesh) return;
     if (it.mesh.parent === cargoMount) return;
 
+    const tk = LEVELS_3D[this.currentLevel]?.truck || this.truck || { x: 0, z: 0, bedW: 4.2, bedD: 4.6, rotY: 0 };
     const slot = this.deliveredSlotCount++;
-    const col = slot % 3;
-    const row = Math.floor(slot / 3) % 3;
-    const tier = Math.floor(slot / 9);
-    const lx = -1.15 + col * 1.15 + ((tier % 2) * 0.14);
-    const lz = -1.35 + row * 1.35;
-    const ly = 0.66 + tier * 0.92;
+    const wx = Number.isFinite(landX) ? landX : it.x;
+    const wz = Number.isFinite(landZ) ? landZ : it.z;
+    const local = truckWorldToLocal(tk, wx, wz);
 
+    const halfW = Math.max(0.7, (tk.bedW || 4.2) * 0.5 - 0.55);
+    const halfD = Math.max(0.8, (tk.bedD || 4.6) * 0.5 - 0.55);
+    let lx = THREE.MathUtils.clamp(local.lx, -halfW, halfW);
+    let lz = THREE.MathUtils.clamp(local.lz, -halfD, halfD);
+    let ly = 0.64;
+
+    // Physical packing: nudge away from nearby cargo or stack upward when bed is crowded
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const crowded = this.truckCargoPlacements.some(
+        (pos) => Math.hypot(pos.lx - lx, pos.lz - lz) < 0.72 && Math.abs(pos.ly - ly) < 0.65
+      );
+      if (!crowded) break;
+      const angle = (slot * 1.9 + attempt * 1.15);
+      const tryX = THREE.MathUtils.clamp(lx + Math.cos(angle) * 0.78, -halfW, halfW);
+      const tryZ = THREE.MathUtils.clamp(lz + Math.sin(angle) * 0.78, -halfD, halfD);
+      const stillCrowded = this.truckCargoPlacements.some(
+        (pos) => Math.hypot(pos.lx - tryX, pos.lz - tryZ) < 0.72 && Math.abs(pos.ly - ly) < 0.65
+      );
+      if (!stillCrowded) {
+        lx = tryX;
+        lz = tryZ;
+        break;
+      }
+      if (attempt % 3 === 2) {
+        ly += 0.86;
+      } else {
+        lx = tryX;
+        lz = tryZ;
+      }
+    }
+
+    this.truckCargoPlacements.push({ lx, ly, lz });
     cargoMount.add(it.mesh);
     const isOversized = it.type === 'bed' || it.type === 'dining_table' || it.type === 'bookshelf' || it.type === 'piano';
-    it.mesh.scale.setScalar(isOversized ? 0.54 : 0.68);
+    it.mesh.scale.setScalar(isOversized ? 0.78 : 0.86);
     it.mesh.position.set(lx, ly, lz);
-    it.mesh.rotation.set(0, ((slot * 0.65) % (Math.PI * 2)) - Math.PI, 0);
+    const relRot = (it.mesh.rotation?.y || 0) - (tk.rotY || 0);
+    it.mesh.rotation.set(0, relRot, 0);
   }
 
   toggleGrab(p) {
@@ -2153,6 +2472,8 @@ export class Game3DApp {
         if (nearest.isLiving) {
           soundManager.petSound();
           this.spawnFloatingText('🐾 ÔM ĐƯỢC RỒI!', p.x, p.y + 1.8, p.z, '#fde68a');
+        } else if (nearest.isCarryOnly) {
+          this.spawnFloatingText(`${p.name}: ${t('carry_only_badge')}!`, p.x, p.y + 1.8, p.z, '#fb923c');
         } else {
           this.spawnFloatingText(`${p.name}: BÊ ĐỒ! 📦`, p.x, p.y + 1.8, p.z, '#fef08a');
         }
@@ -2177,11 +2498,6 @@ export class Game3DApp {
     it.coopPassEligible = true;
 
     this.levelGroup.add(it.mesh);
-    it.x = p.x + Math.sin(p.rotY) * 0.6;
-    it.y = p.y + 1.35;
-    it.z = p.z + Math.cos(p.rotY) * 0.6;
-    this.clampItemInBounds(it);
-    it.mesh.position.set(it.x, it.y, it.z);
 
     let dirX = Math.sin(p.rotY);
     let dirZ = Math.cos(p.rotY);
@@ -2199,14 +2515,44 @@ export class Game3DApp {
       }
     }
 
+    if (it.isCarryOnly) {
+      // Carry-Only heavy/oversized items cannot be hurled — gentle forward shove/drop (~0.9m)
+      it.x = p.x + dirX * 0.92;
+      it.y = p.y + 0.45;
+      it.z = p.z + dirZ * 0.92;
+      this.clampItemInBounds(it);
+      it.mesh.position.set(it.x, it.y, it.z);
+      it.vx = dirX * 2.8;
+      it.vz = dirZ * 2.8;
+      it.vy = 1.7;
+      it.vrot = 0;
+
+      p.chargingThrow = false;
+      p.throwPower = 0;
+      p.throwCooldown = 0.28;
+      p.bobi.playAnimation('CHR_Base_Drop', 0.06);
+      soundManager.grab();
+      this.rumblePlayer(p, 0.28, 70);
+      this.spawnFloatingText(t('carry_only_hint'), p.x, p.y + 1.9, p.z, '#fb923c');
+      this.emitBurst(it.x, it.y, it.z, 0xfb923c, 8);
+      return;
+    }
+
+    it.x = p.x + Math.sin(p.rotY) * 0.6;
+    it.y = p.y + 1.35;
+    it.z = p.z + Math.cos(p.rotY) * 0.6;
+    this.clampItemInBounds(it);
+    it.mesh.position.set(it.x, it.y, it.z);
+
     const perk = this.getVariantPerk(p.variant);
     const hasCatchBoost = (p.catchBoostTimer || 0) > 0;
     const catchBoost = hasCatchBoost ? 1.18 : 1.0;
+    const modThrowMult = this.selectedModifier === 'turbo' ? 1.2 : 1.0;
     p.catchBoostTimer = 0;
 
     const weightMult = it.isSuperHeavy ? 0.68 : (it.isHeavy ? 0.84 : 1.0);
-    const speedXZ = 11.5 * power * weightMult * perk.throwMult * catchBoost;
-    const speedY = 6.2 * power * weightMult * perk.throwMult * catchBoost;
+    const speedXZ = 11.5 * power * weightMult * perk.throwMult * catchBoost * modThrowMult;
+    const speedY = 6.2 * power * weightMult * perk.throwMult * catchBoost * modThrowMult;
 
     it.vx = dirX * speedXZ;
     it.vz = dirZ * speedXZ;
@@ -2285,14 +2631,36 @@ export class Game3DApp {
     const def = LEVELS_3D[this.currentLevel];
     const obstacles = [
       ...def.walls,
+      ...getFixtureObstacles(def),
       ...this.windows.filter(w => !w.isBroken),
       ...(this.mechanics ? this.mechanics.getObstacles() : []),
       ...this.getTruckObstacles(def, isItem)
     ];
 
+    // Oriented bounding footprint for large/long carry-only furniture through doorways
+    let effRX = radius;
+    let effRZ = radius;
+    if (!isItem && entity.holdingItem && entity.holdingItem.footW > 0) {
+      const c = Math.abs(Math.cos(entity.rotY || 0));
+      const s = Math.abs(Math.sin(entity.rotY || 0));
+      const fw = entity.holdingItem.footW;
+      const fd = entity.holdingItem.footD || fw;
+      effRX = Math.max(radius, (fw * c + fd * s) * 0.5);
+      effRZ = Math.max(radius, (fw * s + fd * c) * 0.5);
+    } else if (isItem && entity.footW > 0) {
+      const rot = entity.mesh?.rotation?.y || 0;
+      const c = Math.abs(Math.cos(rot));
+      const s = Math.abs(Math.sin(rot));
+      const fw = entity.footW;
+      const fd = entity.footD || fw;
+      effRX = Math.max(radius, (fw * c + fd * s) * 0.5);
+      effRZ = Math.max(radius, (fw * s + fd * c) * 0.5);
+    }
+
+    let firstHit = null;
     for (const obs of obstacles) {
-      const halfW = obs.w / 2 + radius;
-      const halfD = obs.d / 2 + radius;
+      const halfW = obs.w / 2 + effRX;
+      const halfD = obs.d / 2 + effRZ;
       const obsTop = obs.y + (obs.h || 3.0) / 2;
       if (entity.y > obsTop - 0.3) continue;
 
@@ -2309,10 +2677,10 @@ export class Game3DApp {
           entity.z += dz >= 0 ? penZ : -penZ;
           entity.vz = isItem ? -entity.vz * 0.42 : 0;
         }
-        return obs;
+        if (!firstHit) firstHit = obs;
       }
     }
-    return null;
+    return firstHit;
   }
 
   detachHeldItem(p) {
@@ -2424,9 +2792,27 @@ export class Game3DApp {
     this.padStates = snap.slots;
 
     const p1Pad = snap.slots[0];
-    const p2Pad = snap.slots[1];
-    if (p1Pad?.justPause || (this.gameMode === 'LOCAL_2P' && p2Pad?.justPause)) {
+    const activePadLimit = this.isLocalMultiMode() ? this.getTargetPlayerCount() : 1;
+    let anyPausePressed = false;
+    for (let i = 0; i < activePadLimit; i++) {
+      if (snap.slots[i]?.justPause) {
+        anyPausePressed = true;
+        break;
+      }
+    }
+    if (anyPausePressed && (this.gameState === 'PLAYING' || this.gameState === 'PAUSED' || this.settingsModalOpen)) {
       this.handlePauseToggle();
+    }
+
+    if (this.gameState === 'OVERWORLD' && !this.settingsModalOpen) {
+      if (p1Pad && p1Pad.camRotateDir !== 0) {
+        this.rotateCamera(p1Pad.camRotateDir * (Math.PI / 4));
+      }
+      if ((p1Pad?.justJump || p1Pad?.justGrab) && this.overworld?.hoveredLevelId) {
+        this.currentLevel = this.overworld.hoveredLevelId;
+        this.startOrRestartMatch();
+      }
+      return;
     }
 
     if (this.gameState !== 'PLAYING' || this.settingsModalOpen) return;
@@ -2449,7 +2835,12 @@ export class Game3DApp {
         }
       }
       if (pad.justThrowStart && player.holdingItem) {
-        player.chargingThrow = true;
+        if (player.holdingItem.isCarryOnly) {
+          if (asLanClient) this.sendClientActionSafe('throw', player, false);
+          else this.releaseThrow(player, false);
+        } else {
+          player.chargingThrow = true;
+        }
       }
       if (pad.justThrowRelease && player.chargingThrow) {
         if (asLanClient) {
@@ -2462,9 +2853,10 @@ export class Game3DApp {
       }
     };
 
-    if (this.gameMode === 'LOCAL_2P') {
-      handlePadActions(p1Pad, this.players[0], false);
-      handlePadActions(p2Pad, this.players[1], false);
+    if (this.isLocalMultiMode()) {
+      for (let i = 0; i < this.players.length; i++) {
+        handlePadActions(snap.slots[i], this.players[i], false);
+      }
     } else if (isLanClient) {
       handlePadActions(p1Pad, this.players[1], true);
     } else {
@@ -2475,9 +2867,12 @@ export class Game3DApp {
   updatePlayers(dt) {
     if (this.gameMode === 'SOLO') {
       if (this.players[0]) this.updateSinglePlayerPhysics(this.players[0], dt, this.keys, true, true, this.padStates[0]);
-    } else if (this.gameMode === 'LOCAL_2P') {
+    } else if (this.isLocalMultiMode()) {
       if (this.players[0]) this.updateSinglePlayerPhysics(this.players[0], dt, this.keys, true, false, this.padStates[0]);
       if (this.players[1]) this.updateSinglePlayerPhysics(this.players[1], dt, this.keys, false, true, this.padStates[1]);
+      for (let i = 2; i < this.players.length; i++) {
+        if (this.players[i]) this.updateSinglePlayerPhysics(this.players[i], dt, {}, false, false, this.padStates[i]);
+      }
     } else if (this.gameMode === 'LAN_COOP') {
       if (this.network.role === 'client') {
         if (this.players[0]) this.interpolateSinglePlayer(this.players[0], dt);
@@ -2548,7 +2943,7 @@ export class Game3DApp {
       inX += padState.moveX;
       inY += padState.moveY;
     }
-    const sprinting = !!(srcKeys['ShiftLeft'] || (this.gameMode !== 'LOCAL_2P' && useArrows && srcKeys['ShiftRight']) || padState?.sprint);
+    const sprinting = !!((useWASD && srcKeys['ShiftLeft']) || (!this.isLocalMultiMode() && useArrows && srcKeys['ShiftRight']) || padState?.sprint);
 
     const moveVec = new THREE.Vector3();
     moveVec.addScaledVector(this.camFwdXZ, inY);
@@ -2568,7 +2963,8 @@ export class Game3DApp {
         }
       }
     }
-    const maxSpeed = (sprinting ? 7.2 : 4.8) * carryMult * perk.speedMult;
+    const modSpeedMult = this.selectedModifier === 'turbo' ? 1.25 : 1.0;
+    const maxSpeed = (sprinting ? 7.2 : 4.8) * carryMult * perk.speedMult * modSpeedMult;
     const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
     const surface = (p.isGrounded && this.mechanics)
       ? this.mechanics.surfaceAt(p.x, p.z, p.y)
@@ -2833,7 +3229,7 @@ export class Game3DApp {
       if (isInsideTruckBed(tk, it.x, it.z) && it.y >= 0.0 && it.y <= 1.45) {
         it.isDelivered = true;
         it.vx = it.vy = it.vz = it.vrot = 0;
-        this.mountDeliveredItemInTruck(it);
+        this.mountDeliveredItemInTruck(it, it.x, it.z);
 
         this.deliveryCombo = this.comboTimer > 0 ? this.deliveryCombo + 1 : 1;
         this.comboTimer = 5.5;
@@ -2921,7 +3317,8 @@ export class Game3DApp {
       if (it.y <= floorY && floorY > -1.0) {
         const chefSafe = it.lastOwnerVariant === 'chef' || it.thrownBy?.variant === 'chef';
         const breakVel = chefSafe ? -9.8 : -7.5;
-        if (it.isFragile && it.vy < breakVel) {
+        const skipFragileBreak = this.selectedModifier === 'chill';
+        if (!skipFragileBreak && it.isFragile && it.vy < breakVel) {
           const penalty = Math.floor(it.value * 0.4);
           this.score = Math.max(0, this.score - penalty);
           this.matchStats.fragileBroken++;
@@ -2965,9 +3362,11 @@ export class Game3DApp {
         }
 
         it.y = floorY;
-        const bounceFactor = it.isBouncy ? 0.64 : (it.isLiving ? 0.45 : 0.3);
-        const minBounceVel = it.isBouncy ? 1.8 : 2.8;
-        if (it.isBouncy && Math.abs(it.vy) > minBounceVel) {
+        const isBouncyMod = this.selectedModifier === 'bouncy';
+        const baseBounce = it.isBouncy ? 0.64 : (it.isLiving ? 0.45 : 0.3);
+        const bounceFactor = isBouncyMod ? Math.min(0.92, baseBounce * 1.55) : baseBounce;
+        const minBounceVel = isBouncyMod ? 1.1 : (it.isBouncy ? 1.8 : 2.8);
+        if ((it.isBouncy || isBouncyMod) && Math.abs(it.vy) > minBounceVel) {
           this.emitBurst(it.x, floorY + 0.2, it.z, 0xfde68a, 6);
         }
         it.vy = Math.abs(it.vy) > minBounceVel ? -it.vy * bounceFactor : 0;
@@ -3027,7 +3426,7 @@ export class Game3DApp {
   updateTrajectoryVisual() {
     const isLanClient = this.gameMode === 'LAN_COOP' && this.network.role === 'client';
     const activeP = isLanClient ? this.players[1] : this.players[0];
-    if (!activeP || !activeP.chargingThrow || !activeP.holdingItem || this.gameState !== 'PLAYING') {
+    if (!activeP || !activeP.chargingThrow || !activeP.holdingItem || activeP.holdingItem.isCarryOnly || this.gameState !== 'PLAYING') {
       this.trajectoryDots.forEach(d => d.visible = false);
       return;
     }
@@ -3050,8 +3449,9 @@ export class Game3DApp {
 
     const perk = this.getVariantPerk(activeP.variant);
     const catchBoost = (activeP.catchBoostTimer || 0) > 0 ? 1.18 : 1.0;
+    const modThrowMult = this.selectedModifier === 'turbo' ? 1.2 : 1.0;
     const weightMult = it.isSuperHeavy ? 0.68 : (it.isHeavy ? 0.84 : 1.0);
-    const mult = power * weightMult * perk.throwMult * catchBoost;
+    const mult = power * weightMult * perk.throwMult * catchBoost * modThrowMult;
     const vx = dirX * 11.5 * mult;
     const vz = dirZ * 11.5 * mult;
     const vy = 6.2 * mult;
@@ -3174,8 +3574,9 @@ export class Game3DApp {
       this.landlordRage,
       this.players[0],
       this.players[1],
-      this.gameMode !== 'SOLO',
+      this.players.length > 1,
       {
+        players: this.players,
         bonusLabel: getLevelText(this.currentLevel).bonusLabel,
         bonusFailed: bonusState.failedLive,
         parTime: def.parTime || def.timeLimit,
@@ -3324,7 +3725,7 @@ export class Game3DApp {
           return;
         }
         if (it.isDelivered) {
-          this.mountDeliveredItemInTruck(it);
+          this.mountDeliveredItemInTruck(it, si.x, si.z);
           return;
         }
         if (si.h >= 0 && this.players[si.h]) {
@@ -3483,6 +3884,7 @@ export class Game3DApp {
         this.lowFpsFrames = Math.max(0, this.lowFpsFrames - 1);
       }
 
+      let ovState = null;
       if (this.gameState === 'MENU') {
         this.targetCamAngle = 0.26 + Math.sin(now * 0.00024) * 0.24 + (this.menuOrbitBias || 0);
         if (this.mechanics) {
@@ -3493,6 +3895,23 @@ export class Game3DApp {
           this.players[0].bobi.root.rotation.y += dt * 0.85;
           this.players[0].bobi.update(dt, false);
         }
+      } else if (this.gameState === 'OVERWORLD' && this.overworld) {
+        let ovInX = 0;
+        let ovInY = 0;
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) ovInY += 1;
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) ovInY -= 1;
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) ovInX -= 1;
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) ovInX += 1;
+        if (Math.abs(this.touchMoveX) > 0.08 || Math.abs(this.touchMoveY) > 0.08) {
+          ovInX += this.touchMoveX;
+          ovInY += this.touchMoveY;
+        }
+        if (this.padStates[0]) {
+          ovInX += this.padStates[0].moveX;
+          ovInY += this.padStates[0].moveY;
+        }
+        ovState = this.overworld.update(dt, ovInX, ovInY, this.camFwdXZ, this.camRightXZ);
+        this.syncOverworldHUD(ovState);
       } else if (this.gameState === 'PLAYING') {
         if (!isLanClient && this.comboTimer > 0) {
           this.comboTimer = Math.max(0, this.comboTimer - dt);
@@ -3541,7 +3960,7 @@ export class Game3DApp {
         this.updateParticles(dt);
       }
 
-      // Smooth rotatable camera orbit + dynamic zoom & follow targeting local player (or 2P midpoint)
+      // Smooth rotatable camera orbit + dynamic zoom & follow targeting 1-4 local players or Overworld truck
       this.camAngle = THREE.MathUtils.lerp(this.camAngle, this.targetCamAngle, Math.min(1, dt * 10));
       const curDef = LEVELS_3D[this.currentLevel];
       const mapZoomBase = 1.0 + Math.max(0, (curDef?.floorSize?.w || 26) - 26) * 0.024;
@@ -3550,19 +3969,32 @@ export class Game3DApp {
       let targetFX = 0;
       let targetFZ = 0;
       let targetZoom = mapZoomBase;
-      if (this.gameState !== 'MENU') {
-        if (this.gameMode === 'LOCAL_2P' && this.players.length > 1) {
-          const p1 = this.players[0];
-          const p2 = this.players[1];
-          const midX = (p1.x + p2.x) * 0.5;
-          const midZ = (p1.z + p2.z) * 0.5;
-          const pairDist = Math.hypot(p1.x - p2.x, p1.z - p2.z);
-          targetFX = THREE.MathUtils.clamp(midX * 0.52, -7.5, 7.5);
-          targetFZ = THREE.MathUtils.clamp(midZ * 0.42, -5.0, 5.0);
-          targetZoom = THREE.MathUtils.clamp(mapZoomBase + Math.max(0, pairDist - 7.5) * 0.032, 1.0, 1.44);
+      if (this.gameState === 'OVERWORLD' && ovState) {
+        targetFX = THREE.MathUtils.clamp(ovState.truckX * 0.85, -24, 24);
+        targetFZ = THREE.MathUtils.clamp(ovState.truckZ * 0.85, -16, 16);
+        targetZoom = 1.12 + Math.min(0.16, ovState.speed * 0.012);
+      } else if (this.gameState !== 'MENU') {
+        if (this.isLocalMultiMode() && this.players.length > 1) {
+          let sumX = 0;
+          let sumZ = 0;
+          for (const pl of this.players) {
+            sumX += pl.x;
+            sumZ += pl.z;
+          }
+          const midX = sumX / this.players.length;
+          const midZ = sumZ / this.players.length;
+          let maxSpan = 0;
+          for (let a = 0; a < this.players.length; a++) {
+            for (let b = a + 1; b < this.players.length; b++) {
+              maxSpan = Math.max(maxSpan, Math.hypot(this.players[a].x - this.players[b].x, this.players[a].z - this.players[b].z));
+            }
+          }
+          targetFX = THREE.MathUtils.clamp(midX * 0.52, -9.5, 9.5);
+          targetFZ = THREE.MathUtils.clamp(midZ * 0.42, -6.5, 6.5);
+          targetZoom = THREE.MathUtils.clamp(mapZoomBase + Math.max(0, maxSpan - 7.5) * 0.032, 1.0, 1.56);
         } else if (camTargetPlayer) {
-          targetFX = THREE.MathUtils.clamp(camTargetPlayer.x * 0.52, -7.5, 7.5);
-          targetFZ = THREE.MathUtils.clamp(camTargetPlayer.z * 0.42, -5.0, 5.0);
+          targetFX = THREE.MathUtils.clamp(camTargetPlayer.x * 0.52, -9.5, 9.5);
+          targetFZ = THREE.MathUtils.clamp(camTargetPlayer.z * 0.42, -6.5, 6.5);
         }
       }
       this.camFocusX = THREE.MathUtils.lerp(this.camFocusX || 0, targetFX, Math.min(1, dt * 5));
@@ -3577,7 +4009,9 @@ export class Game3DApp {
       }
 
       this.updateCameraTransform(this.camFocusX, this.camFocusZ, shakeX, shakeY);
-      this.updateHelperVisuals(camTargetPlayer, now);
+      if (this.gameState !== 'OVERWORLD') {
+        this.updateHelperVisuals(camTargetPlayer, now);
+      }
       if (this.gameState === 'PLAYING') {
         this.updateWallOcclusionFade(camTargetPlayer);
       }
